@@ -83,6 +83,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 .days .area { flex: 1; position: relative; height: 20px; }
 .vline { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(23,23,23,.10); }
 .dl { position: absolute; top: 0; padding-left: 4px; font-family: "IBM Plex Mono", monospace; color: #525252; }
+.norec { position: absolute; top: 14px; height: 0; border-top: 1px dashed #b0b0b0; }
 .upbar { position: absolute; top: 10px; height: 8px; border-radius: 2px; background: {{ accent }}; opacity: .85; }
 .mk { position: absolute; padding-left: 4px; white-space: nowrap; font-size: 12px; line-height: 16px; }
 .mk .tx { background: #fff; padding: 0 2px; }
@@ -126,7 +127,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 
   {% set tl = v.timeline %}
   <section class="week keep">
-    <div class="top"><h2 class="head">The {{ period_word }}</h2><p class="key">bar = node up · lights = nightly backups</p></div>
+    <div class="top"><h2 class="head">The {{ period_word }}</h2><p class="key">bar = node up, as recorded{% if tl.any_norec %} · dashes = not recorded{% endif %} · lights = backups</p></div>
     <div class="days"><span class="ln"></span><div class="area">
       {% for dl in tl.days %}{% set left = 100 * loop.index0 / tl.n %}
       <span class="vline" style="left:{{ left }}%"></span>{% if tl.wide or tl.n <= 16 or loop.index0 % 5 == 0 %}<span class="dl" style="left:{{ left }}%">{{ dl }}</span>{% endif %}
@@ -135,6 +136,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
     {% for l in tl.lanes %}
     <div class="lane"><span class="ln">{{ l.name }}</span><div class="area">
       {% for i in range(tl.n) %}<span class="vline" style="left:{{ 100 * i / tl.n }}%"></span>{% endfor %}
+      {% for b in l.norec or [] %}<span class="norec" style="left:{{ b.left }}%;width:{{ b.width }}%"></span>{% endfor %}
       {% for b in l.bars %}<span class="upbar" style="left:{{ b.left }}%;width:{{ b.width }}%"></span>{% endfor %}
       {% for m in l.marks %}
       <span class="mk" style="{{ 'right:0' if m.end else 'left:' ~ m.left ~ '%' }};top:{{ 9 if l.row else 18 }}px">{% if m.level %}<span class="led {{ m.level }}"></span>{% endif %}{% if m.text %}<span class="tx">{{ m.text }}</span>{% endif %}</span>

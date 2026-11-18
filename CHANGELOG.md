@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Availability shows only recorded facts. Without recordings there is no percentage; quorum losses and fencing
+  that the nodes logged are shown with their time and node, and "no quorum loss logged" when the logs cover
+  the period. The timeline draws node-up bars only for recorded time; unrecorded time is dashed.
+- Quorum-regained lines are kept from the journals, so a logged loss shows when it ended.
+
 - Routine AppArmor audit lines are no longer kept from the kernel log (and are removed from earlier
   collections), so real problems stand out in Errors in the logs.
 

@@ -71,3 +71,27 @@ def test_incomplete_data_is_never_called_quiet():
     v = view(d, p, "weekly", st)
     assert v["headline"].startswith("This report is incomplete: 30 requests to Proxmox failed")
     assert "incomplete" in v["verdict"]
+
+
+def test_unrecorded_time_is_never_drawn_or_counted_as_up():
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    d.update(coverage=0.0, available_pct=None, recorded=[], logs_cover=True, logged=[])
+    v = view(d, p, "weekly", st)
+    assert v["fig"]["available"]["value"] == "–"
+    assert v["fig"]["available"]["change"] == "not recorded; no quorum loss logged"
+    node_lanes = [lane for lane in v["timeline"]["lanes"] if lane["bar"]]
+    assert all(not lane["bars"] and lane["norec"] for lane in node_lanes)
+
+
+def test_logged_quorum_loss_is_reported_as_a_fact():
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    t = d["start"] + 86400 + 3 * 3600
+    d.update(coverage=0.0, available_pct=None, recorded=[],
+             logged=[{"t": t, "kind": "lost", "nodes": ["hv-02"], "message": "node lost quorum"},
+                     {"t": t + 600, "kind": "back", "nodes": ["hv-02"], "message": "node has quorum"}])
+    v = view(d, p, "weekly", st)
+    assert v["fig"]["available"]["change"] == "quorum loss logged once"
+    a = v["attention"][0]
+    assert a["level"] == "bad" and a["text"].startswith("Quorum lost Tue 10 Nov 03:00, back Tue 03:10 (logged by hv-02)")

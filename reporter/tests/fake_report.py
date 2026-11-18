@@ -197,7 +197,7 @@ def typical(kind="weekly"):
     ]
     d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 1.0,
          "cluster_name": "example", "api_ok": True, "quorum_lost": [], "available_pct": 100.0,
-         "tasks_read": True, "backups": backups, "storage": storage, "nodes": nodes, "guests": guests,
+         "tasks_read": True, "recorded": [(s_, e_)], "logged": [], "logs_cover": True, "backups": backups, "storage": storage, "nodes": nodes, "guests": guests,
          "guests_running": {"running": len(running), "total": len(gl)}, "changes": changes, "snapshots": snapshots,
          "health": health, "logs": logs, "log_lines": 4, "logs_collected": True, "failed_tasks": [],
          "ceph": {"health": "HEALTH_OK", "osds": 6, "osds_up": 6, "checks": []},
@@ -219,6 +219,7 @@ def empty(kind="weekly"):
     bks = buckets(start, end)
     d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 0.0,
          "cluster_name": None, "api_ok": True, "quorum_lost": [], "available_pct": None, "tasks_read": True,
+         "recorded": [], "logged": [], "logs_cover": False,
          "backups": {"runs_total": 0, "runs_ok": 0, "runs_failed": 0, "rows": [], "failures": [],
                      "nights": [{"label": b["label"], "start": b["start"], "jobs": 0, "ok": 0, "failed": 0, "size": None,
                                  "seconds": None} for b in bks],

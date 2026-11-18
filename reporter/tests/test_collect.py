@@ -107,3 +107,20 @@ def test_apparmor_audit_noise_is_dropped():
              'operation="change_onexec" class="file" info="label not found" error=-22 profile="unconfined"',
              "Mar 19 03:00:02 pve-a kernel: ata3: SATA link down (SStatus 0 SControl 300)"]
     assert snapshot._store_journal("pve-a", lines, now) == 1
+
+
+def test_logged_quorum_events_are_facts_outside_recordings():
+    from app.collect import logged_events
+
+    t0 = int(dt.datetime(2026, 2, 2, tzinfo=TZ).timestamp())
+    with db.tx() as c:
+        for node in ("pve-a", "pve-b"):  # both nodes log the same loss: one event
+            c.execute("insert into logs values (?, 'journal', ?, 'warning', 'pmxcfs', '[status] notice: node lost quorum')",
+                      (t0 + 100, node))
+        c.execute("insert into logs values (?, 'journal', 'pve-a', 'info', 'pmxcfs', '[status] notice: node has quorum')",
+                  (t0 + 700,))
+        c.execute("insert into logs values (?, 'journal', 'pve-a', 'warning', 'pmxcfs', '[status] notice: node lost quorum')",
+                  (t0 + 5000,))
+    ev = logged_events(t0, t0 + 86400)
+    assert [e["kind"] for e in ev] == ["lost", "back", "lost"] and ev[0]["nodes"] == ["pve-a", "pve-b"]
+    assert [e["kind"] for e in logged_events(t0, t0 + 86400, recorded=[(t0 + 4000, t0 + 6000)])] == ["lost", "back"]

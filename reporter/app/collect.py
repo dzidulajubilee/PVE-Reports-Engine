@@ -293,6 +293,44 @@ def running_at(t):
     return {"running": sum(1 for x in rows if x["status"] == "running"), "total": len(rows)}
 
 
+def recorded_intervals(start, end):
+    """[(from, to)] stretches of [start, end) the reporter recorded, a gap over 10 minutes ending a stretch."""
+    out = []
+    for r in db.query("select t from snap_cluster where t >= ? and t < ? order by t", start, end):
+        if out and r["t"] - out[-1][1] <= 600:
+            out[-1][1] = min(r["t"] + 300, end)
+        else:
+            out.append([r["t"], min(r["t"] + 300, end)])
+    return [tuple(x) for x in out]
+
+
+QUORUM_LOST = re.compile(r"lost quorum|non-primary component|not quorate", re.I)
+QUORUM_BACK = re.compile(r"has quorum|within the primary component|quorum regained|is quorate", re.I)
+FENCED = re.compile(r"fenc", re.I)
+
+
+def logged_events(start, end, recorded=()):
+    """Quorum and fencing events exactly as the nodes logged them, outside the recorded stretches (where the
+    recordings are the record). The same event logged by several nodes within a minute counts once."""
+    rows = db.query("select t, node, message from logs where t >= ? and t < ? and (message like '%quorum%' or "
+                    "message like '%primary component%' or message like '%fenc%') order by t", start, end)
+    out = []
+    for r in rows:
+        if any(a <= r["t"] < b for a, b in recorded):
+            continue
+        msg = r["message"]
+        kind = "fence" if FENCED.search(msg) else "lost" if QUORUM_LOST.search(msg) else \
+            "back" if QUORUM_BACK.search(msg) else None
+        if not kind:
+            continue
+        if out and out[-1]["kind"] == kind and r["t"] - out[-1]["t"] <= 60:
+            if r["node"] and r["node"] not in out[-1]["nodes"]:
+                out[-1]["nodes"].append(r["node"])
+            continue
+        out.append({"t": r["t"], "kind": kind, "nodes": [r["node"]] if r["node"] else [], "message": msg[:160]})
+    return out
+
+
 def logs_between(start, end, limit=20):
     """Warnings and errors from the collected logs, the same message on the same node counted once."""
     rows = db.query("select t, source, node, level, unit, message from logs where t >= ? and t < ? and level != 'info' "
@@ -339,6 +377,11 @@ def collect(S, start, end, settings, full=True, now=None):
     lost = sum(b - a for a, b in sc["quorum_lost"])
     d["quorum_lost"] = sc["quorum_lost"]
     d["available_pct"] = (100 * (1 - lost / max(1, (e_ - s_) * d["coverage"]))) if d["coverage"] > 0 else None
+    # facts for the time the reporter didn't record: only what the nodes logged, never an estimate
+    d["recorded"] = recorded_intervals(s_, e_)
+    lf = db.get_state("logs_from")
+    d["logs_cover"] = bool(lf) and int(lf) <= s_
+    d["logged"] = logged_events(s_, e_, d["recorded"])
 
     # ---- backups (tasks are kept by Proxmox, so this works for past periods too)
     tasks = []
@@ -777,10 +820,17 @@ def collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now
     else:
         status = S.get("/cluster/status") or []
         c = next((x for x in status if x.get("type") == "cluster"), None)
-        if c is not None or len(nodes) == 1:
+        lost_logged = [e for e in d["logged"] if e["kind"] == "lost"]
+        if lost_logged:
+            h.append(("quorum", "Quorum", f"loss logged {len(lost_logged)}× (not recorded)", "bad"))
+        elif c is not None or len(nodes) == 1:
             q = (c or {}).get("quorate", 1)
-            h.append(("quorum", "Quorum", "quorate now; history not recorded yet" if q else "not quorate now",
-                      "ok" if q else "bad"))
+            if not q:
+                h.append(("quorum", "Quorum", "not quorate now", "bad"))
+            elif d["logs_cover"]:
+                h.append(("quorum", "Quorum", "no loss logged; quorate now", "ok"))
+            else:
+                h.append(("quorum", "Quorum", "quorate now; earlier not recorded", "ok"))
     down = [n for n in nodes if n["down"]]
     if down:
         parts = [f"{n['name']} down {fmt_minutes(n['down_s'] / 60)}" for n in down]

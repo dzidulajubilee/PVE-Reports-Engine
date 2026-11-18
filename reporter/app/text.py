@@ -213,6 +213,16 @@ def view(d, p, kind, settings, on=None):
         figs[-1]["change"] = f"same as last {word}"
     if d["available_pct"] is not None and (d["available_pct"] < 99.9):
         figs[-1]["tone"] = "bad"
+    lost_logged = [e for e in d.get("logged", []) if e["kind"] == "lost"]
+    if d["available_pct"] is None:  # nothing recorded: no percentage, only what the nodes logged
+        if lost_logged:
+            figs[-1].update(change=f"quorum loss logged {times(len(lost_logged))}", tone="bad")
+        elif d.get("logs_cover"):
+            figs[-1]["change"] = "not recorded; no quorum loss logged"
+        else:
+            figs[-1]["change"] = "not recorded before install"
+    elif cov < 0.95 and not figs[-1]["change"]:
+        figs[-1]["change"] = f"over the {cov:.0%} recorded"
     figs.append({"key": "guests", "label": "Guests running", "value": fnum(gr["running"]) if gr else "–",
                  "of": f"of {gr['total']}" if gr else "",
                  "change": "running now; history starts at install" if gr and gr.get("now") else
@@ -348,6 +358,18 @@ def attention(d, v, word, this, warn_pct, n_nodes):
             f"Quorum lost for {fmin(mins)}", when(d["quorum_lost"][0][0], "%a %H:%M"), d["quorum_lost"][0][0],
             head=f"the cluster lost quorum for {fmin(mins)}",
             plain=f"The servers lost contact with each other for {fmin(mins)}")
+    for e in d.get("logged", []):
+        who = f" (logged by {join(e['nodes'])})" if e["nodes"] else ""
+        if e["kind"] == "lost":
+            back = next((x for x in d["logged"] if x["kind"] == "back" and x["t"] > e["t"]), None)
+            until = f", back {when(back['t'], '%a %H:%M')}" if back else ""
+            add("bad", "availability", f"Quorum lost {when(e['t'], '%a %-d %b %H:%M')}{until}{who}",
+                f"Quorum lost {when(e['t'], '%a %H:%M')}", "logged", e["t"], head="the cluster lost quorum",
+                plain=f"The servers lost contact with each other on {when(e['t'], '%a %-d %b at %H:%M')}")
+        elif e["kind"] == "fence":
+            add("bad", "availability", f"Fencing logged {when(e['t'], '%a %-d %b %H:%M')}{who}",
+                f"Fencing {when(e['t'], '%a %H:%M')}", "logged", e["t"], head="a node was fenced",
+                plain=f"A server was forcibly restarted by high availability on {when(e['t'], '%a %-d %b')}")
     for n in v_nodes_down(d):
         add("bad", "availability", f"{n['name']} was down for {fmin(n['down_s'] / 60)}", f"{n['name']} down {fmin(n['down_s'] / 60)}",
             when(n["down"][0][0], "%a %H:%M"), n["down"][0][0], plain=f"Server {n['name']} was down for {fmin(n['down_s'] / 60)}")
@@ -482,7 +504,14 @@ def sentences(d, v, word, this, n_nodes):
     if q and nodes_part:
         facts.append(f"The cluster {q} and {nodes_part}.")
     elif d["coverage"] < 0.5:
-        facts.append(f"The reporter recorded {d['coverage']:.0%} of this {word}, so uptime figures are partial.")
+        rec = "didn't record" if d["coverage"] == 0 else f"recorded only {d['coverage']:.0%} of"
+        lost_logged = [e for e in d.get("logged", []) if e["kind"] == "lost"]
+        if lost_logged:
+            facts.append(f"The reporter {rec} this {word}; Proxmox logged {plural(len(lost_logged), 'quorum loss', 'quorum losses')}.")
+        elif d.get("logs_cover"):
+            facts.append(f"The reporter {rec} this {word}; Proxmox logged no quorum loss or fencing.")
+        else:
+            facts.append(f"The reporter {rec} this {word}, so there are no uptime figures for it.")
     g = d["guests"]
     if g["ran_all"] is not None:
         part = f"{g['ran_all']} of {g['total']} guests ran all {word}"
@@ -663,14 +692,27 @@ def timeline(d, v, warn_pct):
 
     lanes = []
     for node in d["nodes"]:
-        segs, last = [], s_
-        for a, b in node["down"]:
-            if a > last:
-                segs.append((last, a))
-            last = b
-        if last < e_:
-            segs.append((last, e_))
+        # up = recorded and not down; time nobody recorded is drawn as such, never as up
+        segs = []
+        for ra, rb in d.get("recorded", [(s_, e_)] if d["coverage"] >= 0.95 else []):
+            last = ra
+            for a, b in node["down"]:
+                if b <= ra or a >= rb:
+                    continue
+                if a > last:
+                    segs.append((last, a))
+                last = max(last, b)
+            if last < rb:
+                segs.append((last, rb))
         bars = [{"left": 100 * (a - s_) / span, "width": max(0.5, 100 * (b - a) / span)} for a, b in segs]
+        unrec, last = [], s_
+        for ra, rb in d.get("recorded", [(s_, e_)] if d["coverage"] >= 0.95 else []):
+            if ra > last:
+                unrec.append((last, ra))
+            last = max(last, rb)
+        if last < e_:
+            unrec.append((last, e_))
+        norec = [{"left": 100 * (a - s_) / span, "width": 100 * (b - a) / span} for a, b in unrec if b - a > 900]
         marks = {}
 
         def mark(t, text, level="", marks=marks):
@@ -700,7 +742,11 @@ def timeline(d, v, warn_pct):
                     mark(crossed[0], f"{s['name']} {crossed[1]:.0f}%", "warn")
                 if hist and s["tone"] == "bad":
                     mark(hist[-1][0], f"{hist[-1][1]:.0f}%", "bad")
-        lanes.append({"name": node["name"], "bar": True, "bars": bars, "marks": sorted(marks.values(), key=lambda m: m["left"])})
+        for e in d.get("logged", []):
+            if node["name"] in e["nodes"] and e["kind"] in ("lost", "fence"):
+                mark(e["t"], "quorum lost" if e["kind"] == "lost" else "fenced", "bad")
+        lanes.append({"name": node["name"], "bar": True, "bars": bars, "norec": norec,
+                      "marks": sorted(marks.values(), key=lambda m: m["left"])})
     nights = d["backups"]["nights"]
     bmarks = []
     for i, nt in enumerate(nights):
@@ -717,7 +763,8 @@ def timeline(d, v, warn_pct):
                                   "level": "warn", "end": i == n - 1})
     if rmarks:
         lanes.append({"name": "Restarts", "bar": False, "bars": [], "marks": sorted(rmarks.values(), key=lambda m: m["left"]), "row": True})
-    return {"lanes": lanes, "days": [b["label"] for b in bks], "n": n, "wide": wide}
+    return {"lanes": lanes, "days": [b["label"] for b in bks], "n": n, "wide": wide,
+            "any_norec": any(lane.get("norec") for lane in lanes)}
 
 
 def rack_units(d, v):
