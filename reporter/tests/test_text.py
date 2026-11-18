@@ -60,7 +60,7 @@ def test_empty_cluster_reads_plainly():
     start, end, d, p = fake_report.empty()
     v = view(d, p, "weekly", st)
     assert v["headline"] == "A quiet week: nothing needs attention."
-    assert "wasn't recording yet" in v["coverage_note"] and "own counters" in v["coverage_note"]
+    assert v["coverage_note"].startswith("Not recorded by the reporter") and "own counters" in v["coverage_note"]
     assert v["fig"]["available"]["value"] == "–"
 
 

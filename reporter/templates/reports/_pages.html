@@ -30,7 +30,7 @@
     {{ chart|safe }}
   </section>
   {% endif %}
-  {% set many = v.storage|length > 12 %}
+  {% set many = v.storage|length > 8 %}
   <section class="{{ 'flow' if many else 'keep' }}">
     {{ ptitle(6, "Storage", "h3", "h3") }}
     {% if v.storage %}
@@ -52,7 +52,7 @@
     {% if v.writes_note %}<p class="note">{{ v.writes_note }}</p>{% endif %}
     {% else %}<p class="note">No storage figures could be read</p>{% endif %}
   </section>
-  {% set manyn = v.nodes|length > 12 %}
+  {% set manyn = v.nodes|length > 8 %}
   <section class="{{ 'flow' if manyn else 'keep' }}">
     {{ ptitle(7, "Given out vs installed" if not opt.plain else "Given out vs what the servers have", "h3", "h3") }}
     <table class="t">
@@ -88,16 +88,15 @@
   {% if "network" in on and X.network %}{% set many = X.network|length > 6 %}
   <section class="{{ 'flow' if many else 'keep' }}">
     {{ ptitle(20, "Network traffic", "h3", "h3") }}
-    <div class="{{ '' if many else 'two' }}">
-      <div class="col">
-        <table class="t"><thead><tr><th>Node</th><th class="r">In</th><th class="r">Out</th><th class="r">Peak</th></tr></thead>
-        <tbody>{% for n in X.network %}<tr><td>{{ nm(n.name) }}</td><td class="r nowrap">{{ n['in'] }}</td><td class="r nowrap">{{ n.out }}</td><td class="r nowrap">{{ n.peak }}</td></tr>{% endfor %}</tbody></table>
-      </div>
-      <div class="col"{% if many %} style="margin-top:16px"{% endif %}>
-        {% if X.network_guests %}<table class="t"><thead><tr><th>Busiest guests</th><th class="r">In</th><th class="r">Out</th></tr></thead>
-        <tbody>{% for g in X.network_guests %}<tr><td class="name">{{ gid(g) }}</td><td class="r nowrap">{{ g['in'] }}</td><td class="r nowrap">{{ g.out }}</td></tr>{% endfor %}</tbody></table>{% endif %}
-      </div>
-    </div>
+    {% set nodes_t %}<table class="t"><thead><tr><th>Node</th><th class="r">In</th><th class="r">Out</th><th class="r">Peak</th></tr></thead>
+        <tbody>{% for n in X.network %}<tr><td>{{ nm(n.name) }}</td><td class="r nowrap">{{ n['in'] }}</td><td class="r nowrap">{{ n.out }}</td><td class="r nowrap">{{ n.peak }}</td></tr>{% endfor %}</tbody></table>{% endset %}
+    {% set guests_t %}{% if X.network_guests %}<table class="t"><thead><tr><th>Busiest guests</th><th class="r">In</th><th class="r">Out</th></tr></thead>
+        <tbody>{% for g in X.network_guests %}<tr><td class="name">{{ gid(g) }}</td><td class="r nowrap">{{ g['in'] }}</td><td class="r nowrap">{{ g.out }}</td></tr>{% endfor %}</tbody></table>{% endif %}{% endset %}
+    {% if many %}{# many nodes: the tables follow the heading directly, so they flow and never strand it #}
+    {{ nodes_t }}<div style="height:16px"></div>{{ guests_t }}
+    {% else %}
+    <div class="two"><div class="col">{{ nodes_t }}</div><div class="col">{{ guests_t }}</div></div>
+    {% endif %}
   </section>
   {% endif %}
   {% if "pressure" in on and X.pressure %}
@@ -116,7 +115,7 @@
   {% if "guests" in on %}
   {{ ptitle(8 if opt.lower else n, "Systems (VMs and containers)" if opt.plain else "VMs and containers") }}
   <p class="lede">{{ v.guest_line }}</p>
-  <section class="{{ 'flow' if v.top|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if v.top|length > 8 else 'keep' }}">
     {{ ptitle(9, "Busiest guests", "h3", "h3") }}
     <p class="sub">CPU as a share of what each guest was given, averaged over the {{ v.word }}</p>
     {% if v.top %}
@@ -170,7 +169,7 @@
   </section>
   {% endif %}
   {% if "changes" in on %}
-  <section class="{{ 'flow' if v.changes|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if v.changes|length > 8 else 'keep' }}">
     {{ ptitle(13, "Changes " ~ v.this, "h3", "h3") }}
     {% if v.changes %}
     {% if opt.list %}
@@ -195,7 +194,7 @@
   </section>
   {% endif %}
   {% if "pools" in on and X.pools %}
-  <section class="{{ 'flow' if X.pools|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if X.pools|length > 8 else 'keep' }}">
     {{ ptitle(23, "Pools and tags", "h3", "h3") }}
     <table class="t"><thead><tr><th>Pool</th><th class="r">Guests</th><th class="r">vCPU</th><th class="r">RAM</th><th class="r">Disk</th><th class="r">CPU</th><th class="r">Backups</th></tr></thead>
     <tbody>{% for p in X.pools %}<tr><td>{{ p.pool }}</td><td class="r">{{ p.running }} of {{ p.guests }}</td><td class="r">{{ p.vcpu }}</td><td class="r nowrap">{{ p.ram_text }}</td><td class="r nowrap">{{ p.disk_text }}</td><td class="r">{{ p.cpu_text }}</td><td class="r nowrap">{{ p.backups_ok }}{% if p.backups_failed %} · <span class="t-bad">{{ p.backups_failed }} failed</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
@@ -212,7 +211,7 @@
   <p class="lede">{{ v.backup_line }}</p>
   {% set rows = v.backup_rows %}
   {% set nb = v.buckets|length %}
-  <section class="{{ 'flow' if rows|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if rows|length > 8 else 'keep' }}">
     {% if rows %}
     <table class="bgrid">
       <colgroup><col class="gcol">{% for b in v.buckets %}<col class="dcol">{% endfor %}<col class="lcol"><col class="scol"></colgroup>
@@ -228,7 +227,7 @@
     {% else %}<p class="note">{{ "No guests to back up yet" if not d.guests.total else "No backup results could be read" }}</p>{% endif %}
   </section>
   {% if v.failures %}
-  <section class="{{ 'flow' if v.failures|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if v.failures|length > 8 else 'keep' }}">
     {{ ptitle(15, "Why they failed", "h3", "h3") }}
     {% if opt.list %}
     <ul class="changes">{% for f in v.failures %}<li>{{ f.name }}, {{ f.full_when }}: {{ f.reason[0]|lower }}{{ f.reason[1:] }}</li>{% endfor %}</ul>
@@ -264,7 +263,7 @@
   </section>
   {% endif %}
   {% if "replication" in on and X.replication %}
-  <section class="{{ 'flow' if X.replication|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if X.replication|length > 8 else 'keep' }}">
     {{ ptitle(25, "Replication", "h3", "h3") }}
     <table class="t"><thead><tr><th>Guest</th><th>From → to</th><th>Schedule</th><th class="r">Last sync</th><th class="r">Took</th></tr></thead>
     <tbody>{% for r in X.replication %}<tr><td class="name"><span class="id">{{ r.guest }}</span>{{ r.name }}</td><td class="nowrap">{{ r.source }} → {{ r.target }}</td><td class="muted">{{ r.schedule }}</td><td class="r nowrap {{ 't-bad' if r.fail_count }}">{{ r.last_text }}{% if r.fail_count %} · {{ r.fail_count }} failed{% endif %}</td><td class="r">{{ r.dur_text }}</td></tr>{% endfor %}</tbody></table>
@@ -308,7 +307,7 @@
   </section>
   {% endif %}
   {% if "tasks" in on and X.tasks is defined %}
-  <section class="{{ 'flow' if X.tasks|length > 12 else 'keep' }}">
+  <section class="{{ 'flow' if X.tasks|length > 8 else 'keep' }}">
     {{ ptitle(29, "Failed tasks", "h3", "h3") }}
     {% if X.tasks %}
     <table class="t"><tbody>{% for t in X.tasks %}<tr><td class="mono small muted nowrap when">{{ t.when }}</td><td class="name">{{ t.what }}{% if t.guest %} · {{ t.guest }}{% endif %}</td><td class="small t-bad name">{{ t.status[:90] }}</td><td class="r mono small muted nowrap">{{ t.user }}</td></tr>{% endfor %}</tbody></table>

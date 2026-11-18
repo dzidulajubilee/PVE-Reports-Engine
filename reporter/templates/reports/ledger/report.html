@@ -5,7 +5,6 @@
 {% block footfont %}"JetBrains Mono", monospace{% endblock %}
 {% block footcolor %}#737373{% endblock %}
 {% block pagesep %}"/"{% endblock %}
-{% block headcontent %}"§ " string(topic){% endblock %}
 {% block style %}
 body { font-family: "JetBrains Mono", monospace; color: #171717; font-size: 12px; line-height: 16px; }
 .mono { font-family: "JetBrains Mono", monospace; }
@@ -53,7 +52,9 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
 .counts > span { margin-right: 24px; } .counts .gen { margin-left: auto; margin-right: 0; color: #525252; }
 
 /* pages 2+: dense mono tables with a hard rule under each section title, like a log file */
+.ptitle { string-set: topic "§ " content(text); }  /* the running header: "§ 05 capacity", nothing before a topic */
 .page .sec { border-bottom: 2px solid #171717; padding-bottom: 4px; }
+.summary > .datanote { margin: 8px 0 0; padding: 0 0 8px; border-bottom: 1px solid rgba(23,23,23,.10); }
 .page .sec.h3 { border-bottom: 1px solid #171717; }
 .lede { padding: 6px 0; border-bottom: 1px dashed rgba(23,23,23,.25); }
 {% endblock %}
@@ -62,6 +63,7 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
 <section class="summary">
   <div class="top"><span class="t1">{{ noun|lower }}-report {{ week_word|lower }}</span><span class="t2">{{ start.strftime('%Y-%m-%d') }} → {{ last.strftime('%Y-%m-%d') }} · {{ (name or "cluster")|lower|replace(" ", "-") }} · {{ v.nodes|length }} node{{ 's' if v.nodes|length != 1 }} · {{ d.guests.total }} guests</span></div>
   <div class="counts"><span><span class="ok">ok</span> {{ v.counts.ok }}</span><span><span class="warn">warn</span> {{ v.counts.warn }}</span><span><span class="fail">fail</span> {{ v.counts.fail }}</span><span class="gen">generated {{ generated.strftime('%Y-%m-%d %H:%M') }} · data coverage {{ "%.0f"|format(100 * d.coverage) }}%</span></div>
+  {{ P.notes() }}
 
   <section class="{{ 'flow' if v.findings|length > 12 else 'keep' }}">
     <div class="sec">01 <span>findings</span></div>
@@ -96,7 +98,6 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
       <tbody>{% for n in v.nights %}<tr><td>{{ v.night_labels[loop.index0] }}</td><td class="r">{{ n.jobs }}</td><td class="r">{{ n.ok }}</td><td class="r {{ 'fail' if n.failed else 'muted' }}">{{ n.failed }}</td><td class="r">{{ n.size_text|replace(" ", "") }}</td><td class="r">{{ n.dur_text }}</td></tr>{% endfor %}</tbody>
     </table>
   </section>
-  {{ P.notes() }}
 </section>
 {{ P.rest() }}
 {% endblock %}

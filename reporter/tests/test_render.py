@@ -30,7 +30,7 @@ def test_longer_periods(template, kind, tmp_path):
     assert render_pdf(html, tmp_path / "r.pdf") == []
 
 
-def test_summary_is_one_page(tmp_path):
+def test_summary_is_one_page():
     from weasyprint import HTML
 
     st = config.load_settings()
@@ -38,7 +38,6 @@ def test_summary_is_one_page(tmp_path):
     for t in config.TEMPLATES:
         html = render("weekly", start, end, d, p, st, "summary", set(), template=t)
         assert len(HTML(string=html, base_url=str(config.ROOT)).render().pages) == 1, t
-
 
 def test_reports_load_only_bundled_fonts_and_the_logo():
     from app.build import safe_fetcher
@@ -66,3 +65,14 @@ def test_reports_use_the_bundled_fonts(tmp_path):
         html = render("weekly", start, end, d, p, st, "summary", set(), template=t)
         pdf = HTML(string=html, base_url=str(config.ROOT), url_fetcher=safe_fetcher()).write_pdf(uncompressed_pdf=True)
         assert font in pdf, t  # font names are only readable when the PDF isn't compressed
+
+
+def test_summary_with_many_storages_and_a_data_note(tmp_path):
+    """Like a real three-node cluster: ten storages and the note for a week the reporter didn't record."""
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    d["storage"] = d["storage"] + [dict(x, name=x["name"] + "-b") for x in d["storage"]]
+    d.update(coverage=0.0, available_pct=None, recorded=[])
+    for t in config.TEMPLATES:  # page 1 may run over, but never leave a stray line or note on a page of its own
+        html = render("weekly", start, end, d, p, st, "summary", set(), template=t)
+        assert render_pdf(html, tmp_path / f"{t}.pdf") == [], t

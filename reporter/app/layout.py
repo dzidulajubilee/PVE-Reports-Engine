@@ -66,10 +66,11 @@ def problems(document, min_fill=0.3):
         fill = (bottom - top) / page._page_box.height
         # a topic's last page may be short when the next topic starts a fresh page by design
         topics_here = {id(e) for _, _, els in texts for e in els if "page" in (e.get("class") or "").split()}
+        # (a page holding only a stray line or note, under 12% full, is still a problem)
         next_topic = n < len(pages) and any(
             "page" in (e.get("class") or "").split() and id(e) not in topics_here
             for _, _, els in list(_text_boxes(pages[n]._page_box.children[0]))[:1] for e in els)
-        if n < len(pages) and fill < min_fill and not (next_topic and fill >= 0.08):
+        if n < len(pages) and fill < min_fill and not (next_topic and fill >= 0.12):
             out.append(f"page {n} is {fill:.0%} full and the rest moved to page {n + 1}")
         if n == len(pages):
             continue

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fonts carry Greek letters, arrows and box drawing, so no symbol falls back to a system font.
+- Page flow: longer tables (over 8 rows) flow across pages; a data note stays with the block above it; Rack and
+  network headings never end a page; Ledger keeps its data note under the header.
+
 - Settings: the logo picker is a quiet button that shows the chosen file's name and previews it before saving.
 
 - Logbook: dates, node and guest counts and the time made sit under the title; the upper right is left for

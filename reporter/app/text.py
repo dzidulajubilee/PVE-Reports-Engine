@@ -726,9 +726,8 @@ def coverage_note(d, word):
     if c >= 0.95:
         return ""
     if c == 0:
-        return (f"The reporter wasn't recording yet during this {word}. Uptime comes from the nodes' own counters, "
-                "quorum and fencing only from what the nodes logged, and guest restarts aren't known. Load, storage "
-                "and backups come from Proxmox's own history and are complete.")
+        return (f"Not recorded by the reporter this {word}: uptime is from the nodes' own counters, quorum and fencing "
+                "from their logs, guest restarts unknown. Load, storage and backups are complete.")
     return (f"The reporter recorded {c:.0%} of this {word}. Uptime, restarts and quorum cover only that part; "
             "comparisons with the previous period are left out where they wouldn't be fair.")
 
