@@ -62,3 +62,12 @@ def test_empty_cluster_reads_plainly():
     assert v["headline"] == "A quiet week: nothing needs attention."
     assert "wasn't recording yet" in v["coverage_note"]
     assert v["fig"]["available"]["value"] == "–"
+
+
+def test_incomplete_data_is_never_called_quiet():
+    st = config.load_settings()
+    start, end, d, p = fake_report.empty()
+    d["_errors"] = 30
+    v = view(d, p, "weekly", st)
+    assert v["headline"].startswith("This report is incomplete: 30 requests to Proxmox failed")
+    assert "incomplete" in v["verdict"]

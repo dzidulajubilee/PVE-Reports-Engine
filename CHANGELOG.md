@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Backups: the latest backup of each guest now comes from the backup task logs (and the backup server when set
+  up), because Proxmox lists backup files only to tokens that may make backups. No more "never" for guests
+  that are backed up.
+- A report missing many figures now says it is incomplete instead of calling the period quiet.
+- Guests running shows the current count for periods before the reporter was installed.
+- The organisation name isn't repeated when it matches the cluster name.
+
 - Settings: the Save button stays in view at the bottom of the window, says when there are unsaved changes,
   and the page asks before you leave with changes unsaved. The test email moved into the Email server section.
 

@@ -78,7 +78,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 {% block body %}
 <section class="summary">
   <div class="hdr">
-    <div><p class="kicker">{{ name or "Proxmox" }} · {{ cluster }}</p><h1>The {{ period_word }} in load</h1></div>
+    <div><p class="kicker">{{ kicker }}</p><h1>The {{ period_word }} in load</h1></div>
     <div style="text-align:right">{% if logo %}<img class="logo" src="{{ logo }}" alt=""><br>{% endif %}<p class="meta">{{ week_word[0]|upper }}{{ week_word[1:] }}<br>{{ dates if kind != "custom" else title }}</p></div>
   </div>
   <p class="say">{{ v.pulse_line }}</p>

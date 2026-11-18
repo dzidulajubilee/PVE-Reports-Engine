@@ -215,7 +215,8 @@ def view(d, p, kind, settings, on=None):
         figs[-1]["tone"] = "bad"
     figs.append({"key": "guests", "label": "Guests running", "value": fnum(gr["running"]) if gr else "–",
                  "of": f"of {gr['total']}" if gr else "",
-                 "change": change_count(gr["running"] if gr else None, pgr["running"] if pgr else None, word, bool(pgr)),
+                 "change": "running now; history starts at install" if gr and gr.get("now") else
+                 change_count(gr["running"] if gr else None, pgr["running"] if pgr else None, word, bool(pgr) and not pgr.get("now")),
                  "tone": ""})
     bc = b["runs_failed"]
     pbc = p.get("backups", {}).get("runs_failed")
@@ -228,7 +229,7 @@ def view(d, p, kind, settings, on=None):
         bchange = change_count(b["runs_ok"], p["backups"]["runs_ok"], word, True)
     figs.append({"key": "backups", "label": "Backups that ran", "value": fnum(b["runs_ok"]),
                  "of": f"of {b['runs_total']}", "change": bchange, "tone": "bad" if bc else ""})
-    figs.append({"key": "storage", "label": "Shared storage used" if main and main["shared"] else "Fullest storage",
+    figs.append({"key": "storage", "label": "Shared storage used" if main and main["shared"] else "Fullest guest storage",
                  "value": fpct(main["pct"]) if main else "–", "of": "",
                  "change": change_pts(main["pct"] if main else None, pm["pct"] if pm else None, word), "tone": ""})
     v["figs"] = figs
@@ -309,6 +310,8 @@ def view(d, p, kind, settings, on=None):
     v["areas"] = areas(d, v, word, n_nodes)
     v["recommend"] = recommend(d, v, word, n_nodes)
     v["verdict"] = verdict(v)
+    if d.get("_errors", 0) >= 3:
+        v["verdict"] = "This report is incomplete. Some figures couldn't be read from Proxmox."
     v["coverage_note"] = coverage_note(d, word)
     v["counts"] = {"ok": v["health_ok"] + sum(1 for r in rows if not r["tone"]) +
                    sum(1 for n in nodes if n["online"] and not n["down"] and (n["mem_max"] or 0) < 90),
@@ -380,15 +383,15 @@ def attention(d, v, word, this, warn_pct, n_nodes):
             head=f"{len(f)} {'nightly ' if word == 'week' else ''}backup{'s' * (len(f) != 1)} failed")
     for r in b.get("stale", [])[:3]:
         add("bad", "backups", f"{r['name']} ({r['vmid']}) had no successful backup {this}", f"{r['name']}: no good backup",
-            f"last {when(r['latest'], '%-d %b')}" if r["latest"] else "never",
+            f"last {when(r['latest'], '%-d %b')}" if r["latest"] else "none recently",
             plain=f"System {r['name']} had no successful backup {this}", head=f"{r['name']} has no recent backup")
     nij = [r for r in b.get("not_in_job", []) if r["running"]] or b.get("not_in_job", [])
     if nij:
         if len(nij) == 1:
             r = nij[0]
             add("warn", "backups", f"{r['name']} ({r['vmid']}) is in no backup job", f"{r['name']} in no backup job",
-                "never backed up" if not r["latest"] else f"last {when(r['latest'], '%-d %b')}",
-                plain=f"One system ({r['name']}) has never been backed up" if not r["latest"] else
+                "no recent backup" if not r["latest"] else f"last {when(r['latest'], '%-d %b')}",
+                plain=f"One system ({r['name']}) has no recent backup" if not r["latest"] else
                 f"System {r['name']} is not in any backup schedule")
         else:
             add("warn", "backups", f"{len(nij)} guests are in no backup job: {join([r['name'] for r in nij[:4]])}" +
@@ -459,7 +462,11 @@ def sentences(d, v, word, this, n_nodes):
     bad, warn = v["bad"], v["warn"]
     rough = any(a["area"] == "availability" and a["level"] == "bad" for a in bad)
     mood = "A rough" if rough else "A steady"
-    if not bad and not warn:
+    missing = d.get("_errors", 0)
+    if missing >= 3:  # never call a week quiet when most of it couldn't be read
+        head = (f"This report is incomplete: {missing} requests to Proxmox failed, so some figures show as –."
+                + (f" {plural(len(bad), 'problem')} found in what could be read." if bad else ""))
+    elif not bad and not warn:
         head = f"A quiet {word}: nothing needs attention."
     elif not bad:
         head = f"{mood} {word} with nothing urgent and {plural(len(warn), 'thing')} to plan."
@@ -537,7 +544,7 @@ def backup_line(b, word, this):
                 s += f" Every guest in a job has a good backup from the last {'day' if days == 1 else plural(days, 'day')}."
     nij = b.get("not_in_job", [])
     if len(nij) == 1:
-        s += f" {nij[0]['name']} has {'never been backed up' if not nij[0]['latest'] else 'no backup job'}."
+        s += f" {nij[0]['name']} is in no backup job" + ("" if nij[0]["latest"] else " and has no recent backup") + "."
     elif nij:
         s += f" {len(nij)} guests are in no backup job."
     return s
@@ -598,7 +605,8 @@ def backup_rows(b):
     for r in b.get("rows", []):
         if not r["running"] and not any(x in ("ok", "fail") for x in r["days"]) and r["in_job"]:
             continue  # a stopped guest nobody backs up any more is clutter; it's listed under stopped guests
-        rows.append({**r, "latest_text": when(r["latest"], "%-d %b %H:%M") if r["latest"] else "never",
+        rows.append({**r, "latest_text": when(r["latest"], "%-d %b %H:%M") if r["latest"] else (
+                         "over a month ago" if r["in_job"] and r.get("looked_back") else "none recently"),
                      "size_text": fbytes(r["size"]) if r["size"] else "–", "late": not r["in_job"] or not r["latest"]})
     return rows
 
@@ -895,7 +903,7 @@ def recommend(d, v, word, n_nodes):
     nij = d["backups"].get("not_in_job", [])
     if nij and len(out) < 3:
         x = next((g for g in d["guests"]["list"] if g["vmid"] == nij[0]["vmid"]), None)
-        size = f"It holds {fbytes(x['maxdisk'])} and has never been backed up" if x and x["maxdisk"] and not nij[0]["latest"] else \
+        size = f"It holds {fbytes(x['maxdisk'])} and has no recent backup" if x and x["maxdisk"] and not nij[0]["latest"] else \
             "It isn't in any backup schedule"
         out.append({"title": f"Add {nij[0]['name']} to a backup job" if len(nij) == 1 else f"Add {len(nij)} systems to a backup job",
                     "why": size})

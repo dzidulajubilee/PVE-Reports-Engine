@@ -64,7 +64,7 @@ h1 { margin-top: 24px; font-family: "Newsreader", Georgia, serif; font-size: 40p
 
 {% block body %}
 <section class="summary">
-  <div class="kicker"><span>{{ name or "Proxmox" }} · {{ cluster }} · {{ title }}{% if kind in ("weekly", "quarterly") %}, {{ dates }}{% endif %}</span>{% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}</div>
+  <div class="kicker"><span>{{ kicker }} · {{ title }}{% if kind in ("weekly", "quarterly") %}, {{ dates }}{% endif %}</span>{% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}</div>
   <h1>{{ v.verdict }}</h1>
   <p class="intro">{{ v.plain_line }}</p>
 

@@ -348,7 +348,7 @@ def collect(S, start, end, settings, full=True, now=None):
             x.setdefault("node", n)
             tasks.append(x)
     d["tasks_read"] = bool(online)
-    backups = collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full)
+    backups = collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full, online)
     d["backups"] = backups
 
     # ---- storage (RRD history works for past periods too)
@@ -409,8 +409,10 @@ def collect(S, start, end, settings, full=True, now=None):
 
     # ---- guests
     d["guests"] = collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks)
-    d["guests_running"] = {"running": sum(1 for g in guests_res if g.get("status") == "running"),
-                           "total": len(guests_res)} if e_ >= now - 900 else running_at(e_ - 1)
+    current = {"running": sum(1 for g in guests_res if g.get("status") == "running"), "total": len(guests_res)}
+    d["guests_running"] = current if e_ >= now - 900 else running_at(e_ - 1)
+    if d["guests_running"] is None:  # a period before the reporter recorded anything: say what's running now
+        d["guests_running"] = {**current, "now": True}
     d["changes"] = changes(tasks, guests_res, snap_guests(s_, e_), s_, e_) if full else []
     d["snapshots"] = collect_snapshots(S, guests_res, now, settings["general"].get("snapshot_days", 30))
 
@@ -506,7 +508,7 @@ def collect_storage(S, stores_res, storage_cfg, start, end, now, settings):
     return out
 
 
-def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full):
+def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full, online_nodes=()):
     names = {g["vmid"]: g.get("name") or str(g["vmid"]) for g in guests_res}
     runs = []
     for t in tasks:
@@ -549,6 +551,45 @@ def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, 
     not_backed = S.get("/cluster/backup-info/not-backed-up")
     not_in_job = {x["vmid"] for x in not_backed or [] if "vmid" in x}
 
+    # Proxmox lists backup files only to callers allowed to make backups, so a read-only token usually sees none.
+    # The task logs (and the backup server, when it's set up) say the same thing without write rights.
+    def seen_ok(v, t, size=None, verify=None):
+        if v not in latest or t > latest[v]["ctime"]:
+            latest[v] = {"ctime": t, "size": size if size is not None else (latest.get(v) or {}).get("size"),
+                         "storage": None, "verify": verify}
+
+    for r in ok:
+        seen_ok(r["vmid"], r["t"], r["size"])
+    if S.pbs:
+        for ds in S.pbs_get("/admin/datastore") or []:
+            for grp in S.pbs_get(f"/admin/datastore/{ds.get('store')}/groups") or []:
+                bid = str(grp.get("backup-id", ""))
+                if grp.get("backup-type") in ("vm", "ct") and bid.isdigit() and grp.get("last-backup"):
+                    seen_ok(int(bid), int(grp["last-backup"]))
+    wanted = {g["vmid"] for g in guests_res} - set(latest)
+    if wanted and online_nodes:
+        # look back a month before the period for guests not backed up inside it, newest runs first
+        earlier = []
+        for n in online_nodes:
+            for t in S.get(f"/nodes/{n}/tasks", since=s_ - 31 * DAY, until=s_, typefilter="vzdump", limit=500) or []:
+                t.setdefault("node", n)
+                earlier.append(t)
+        for t in sorted(earlier, key=lambda t: -(t.get("starttime") or 0)):
+            if not wanted:
+                break
+            if t.get("status") not in ("OK", None) and not str(t.get("status", "")).startswith(("WARNINGS", "job errors")):
+                continue
+            if str(t.get("id", "")).isdigit():
+                found = [{"vmid": int(t["id"]), "ok": t.get("status") == "OK", "t": t["starttime"], "size": None}]
+            else:
+                lines = S.get(f"/nodes/{t['node']}/tasks/{t['upid']}/log", limit=50000)
+                found = parse_vzdump([x.get("t", "") for x in lines or []], t["starttime"], tz)
+            for f in found:
+                if f["ok"] and f["vmid"] in wanted:
+                    seen_ok(f["vmid"], f["t"], f.get("size"))
+                    wanted.discard(f["vmid"])
+    looked_back = 31 if online_nodes else 0
+
     per_guest = defaultdict(lambda: [""] * len(bks))
     for r in sorted(runs, key=lambda r: r["t"]):
         i = bucket_of(r["t"], bks)
@@ -564,6 +605,7 @@ def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, 
         if v in not_in_job:
             days = ["none" if not x else x for x in days]
         rows.append({"vmid": v, "name": names[v], "days": days, "latest": last["ctime"] if last else None,
+                     "looked_back": looked_back,
                      "size": last["size"] if last else None, "in_job": v not in not_in_job,
                      "verify": last["verify"] if last else None, "running": g.get("status") == "running"})
     # guests in a job without a good backup in the period

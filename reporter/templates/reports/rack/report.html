@@ -98,7 +98,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
     </div>
 
     <div class="main">
-      <p class="kicker">{{ name or "Proxmox" }} · {{ cluster }}</p>
+      <p class="kicker">{{ kicker }}</p>
       {% if logo %}<img class="logo" src="{{ logo }}" alt="" style="float:right">{% endif %}
       <h1>{{ week_word[0]|upper }}{{ week_word[1:] }}</h1>
       <p class="dates">{{ dates if kind != "custom" else title }}</p>

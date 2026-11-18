@@ -90,6 +90,8 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
     if template == "ledger":
         footer_left = f"{(name or 'cluster').lower().replace(' ', '-')} · cluster-report · " + (
             f"{start:%G}-W{start.isocalendar().week:02d}" if kind == "weekly" else f"{start:%Y-%m-%d}")
+    cl = d.get("cluster_name") or "Proxmox cluster"
+    kicker = name if name and name.lower() == cl.lower() else f"{name or 'Proxmox'} · {cl}"  # never "Acme · Acme"
     env = environment()
     return env.get_template(f"reports/{template}/report.html").render(
         T=template, name=name, kind=kind, title=title, dates=dates, week_word=week_word, period_word=period_word,
@@ -99,6 +101,7 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
         fonts=(config.ROOT / "fonts").as_uri(), logo=logo.as_uri() if logo else None, generated=generated,
         pve_url=pve_url, footer_left=footer_left, tz=str(config.TZ), errors=d.get("_errors", 0),
         denied=d.get("_denied", []), cluster=d.get("cluster_name") or "Proxmox cluster",
+        kicker=kicker,
     )
 
 
