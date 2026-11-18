@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Routine AppArmor audit lines are no longer kept from the kernel log (and are removed from earlier
+  collections), so real problems stand out in Errors in the logs.
+
 - Fix: reading node journals failed with "utf-8 codec can't decode byte 0x8b" because Proxmox gzips them. API
   answers are now unpacked, and asked for gzipped, which is faster on slow links.
 - README: a Proxmox permissions section with commands, web-interface steps and common mistakes.

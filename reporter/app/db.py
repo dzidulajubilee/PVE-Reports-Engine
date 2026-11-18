@@ -110,3 +110,5 @@ def prune(now):
     with tx() as c:
         for t in ("snap_cluster", "snap_node", "snap_guest", "snap_storage", "logs"):
             c.execute(f"delete from {t} where t < ?", (cut,))  # noqa: S608 - fixed table names
+        # AppArmor audit lines kept by earlier versions (see snapshot.NOISE)
+        c.execute("delete from logs where unit = 'kernel' and message like 'audit: type=%apparmor=%'")

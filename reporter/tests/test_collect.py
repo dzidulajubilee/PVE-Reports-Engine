@@ -97,3 +97,13 @@ def test_backfill_reads_past_journals_once():
     again, _ = snapshot.backfill(Api(), 7, now=now)
     assert again == 0
     assert int(db.get_state("logs_from")) <= now - 6 * 86400
+
+
+def test_apparmor_audit_noise_is_dropped():
+    from app import snapshot
+
+    now = int(dt.datetime(2026, 3, 20, 12, tzinfo=TZ).timestamp())
+    lines = ['Mar 19 03:00:01 pve-a kernel: audit: type=1400 audit(1773890401.123:42): apparmor="DENIED" '
+             'operation="change_onexec" class="file" info="label not found" error=-22 profile="unconfined"',
+             "Mar 19 03:00:02 pve-a kernel: ata3: SATA link down (SStatus 0 SControl 300)"]
+    assert snapshot._store_journal("pve-a", lines, now) == 1

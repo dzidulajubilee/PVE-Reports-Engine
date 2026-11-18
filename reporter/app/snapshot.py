@@ -20,6 +20,8 @@ JOURNAL_UNITS = re.compile(r"^(pve[\w-]*|corosync|ceph[\w-]*|zfs[\w-]*|zed|kerne
                            r"pmxcfs|spiceproxy|proxmox-[\w-]*|smartd)$")
 BAD_WORDS = re.compile(r"\b(error|failed|failure|fail|fence|fencing|degraded|unable|timeout|timed out|crit|"
                        r"critical|panic|i/o error|segfault|out of memory|oom|link down|is down|went down|lost|retransmit|not quorate|members left)\b", re.I)
+# routine kernel audit lines (AppArmor confining containers) that drown the real problems
+NOISE = re.compile(r'audit: type=\d+ audit\([^)]*\): apparmor="(DENIED|STATUS|ALLOWED|AUDIT)"')
 JOURNAL_LINE = re.compile(r"^(?P<ts>\w{3} +\d+ [\d:]+) (?P<host>\S+) (?P<unit>[\w.@-]+?)(?:\[\d+\])?: (?P<msg>.*)$")
 
 
@@ -90,7 +92,7 @@ def _store_journal(node, lines, now):
             if not m:
                 continue  # cursor lines and anything that isn't a log line
             unit = m["unit"].split("@")[0]
-            if not JOURNAL_UNITS.match(unit) or not BAD_WORDS.search(m["msg"]):
+            if not JOURNAL_UNITS.match(unit) or not BAD_WORDS.search(m["msg"]) or NOISE.search(m["msg"]):
                 continue
             level = "error" if re.search(r"error|fail|panic|fenc|oom|out of memory|crit", m["msg"], re.I) else "warning"
             cur = c.execute("insert or ignore into logs values (?, 'journal', ?, ?, ?, ?)",
