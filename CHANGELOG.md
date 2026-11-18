@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: install.sh stopped silently on a re-run when .env had no PORTAL_PORT. It now says where it stops if
+  anything fails.
+- install.sh run as root no longer makes the reporter run as root; an existing root install is moved to an
+  ordinary user and its data handed over.
+
 - The portal now answers on https://server (port 443) by default, and plain http://server redirects to it. Set
   PORTAL_PORT and HTTP_PORT in .env to use other ports.
 - Setup guide: how to fix a 403 Permission check failed.

@@ -18,6 +18,9 @@ set_env() { # set_env KEY VALUE: replace or add KEY=VALUE in reporter/.env witho
 }
 get_env() { grep -E "^$1=" reporter/.env 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
+# say where it stopped instead of exiting silently
+trap 'warn "install.sh stopped at line $LINENO. Nothing after that step ran."' ERR
+
 CERT_ONLY=0
 [ "${1:-}" = "--cert" ] && CERT_ONLY=1
 
@@ -26,7 +29,20 @@ docker compose version > /dev/null 2>&1 || { warn "The Docker Compose plugin isn
 command -v openssl > /dev/null || { warn "openssl isn't installed (apt install openssl)"; exit 1; }
 
 # ---------------------------------------------------------------- settings
-[ -f .env ] || printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env
+# the reporter runs as an ordinary user, never root: when the installer runs as root, use the owner of this
+# folder, or 1000 if root owns it too
+uid=$(id -u); gid=$(id -g)
+if [ "$uid" = 0 ]; then
+  uid=$(stat -c %u .); gid=$(stat -c %g .)
+  if [ "$uid" = 0 ]; then uid=1000; gid=1000; fi
+fi
+if [ ! -f .env ]; then
+  printf 'UID=%s\nGID=%s\n' "$uid" "$gid" > .env
+elif grep -qE '^UID=0$' .env; then  # an earlier install run as root: move it to an ordinary user
+  sed -i -e "s/^UID=0$/UID=$uid/" -e "s/^GID=0$/GID=$gid/" .env
+  note "The reporter ran as root; it now runs as user $uid."
+fi
+uid=$(grep -E '^UID=' .env | cut -d= -f2 || true); gid=$(grep -E '^GID=' .env | cut -d= -f2 || true)
 if [ ! -f reporter/.env ]; then
   cp reporter/.env.example reporter/.env
   FRESH=1
@@ -35,6 +51,8 @@ else
 fi
 chmod 600 reporter/.env
 mkdir -p reporter/out
+# the container's user must own its data (and only it can read the secrets in there)
+if [ "$(id -u)" = 0 ]; then chown -R "$uid:$gid" reporter/out; fi
 
 # fingerprint HOST[:PORT] -> SHA-256 fingerprint of the certificate it shows, or nothing
 fingerprint() {
@@ -96,8 +114,8 @@ fi
 
 # ---------------------------------------------------------------- start
 # the portal's ports must be free on this host (another web server often holds 80 or 443)
-port=$(grep -E '^PORTAL_PORT=' .env | cut -d= -f2); port=${port:-443}
-http_port=$(grep -E '^HTTP_PORT=' .env | cut -d= -f2); http_port=${http_port:-80}
+port=$(grep -E '^PORTAL_PORT=' .env | cut -d= -f2 || true); port=${port:-443}
+http_port=$(grep -E '^HTTP_PORT=' .env | cut -d= -f2 || true); http_port=${http_port:-80}
 if ! docker compose ps --status running nginx 2> /dev/null | grep -q nginx; then
   for p in "$port" "$http_port"; do
     if command -v ss > /dev/null && ss -ltnH "sport = :$p" | grep -q .; then
