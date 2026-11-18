@@ -746,7 +746,7 @@ def collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks):
             "restarts": restarts,
             "ran_all": bool(info) and info["running_share"] >= 0.999 and not restarts,
             "stopped_since": stopped_since,
-            "tags": [t for t in (g.get("tags") or "").split(";") if t],
+            "tags": [t for t in re.split(r"[;,\s]+", g.get("tags") or "") if t.strip()],  # Proxmox accepts ; , or space
             "pool": g.get("pool"),
         })
     running = [g for g in out if g["status"] == "running"]
