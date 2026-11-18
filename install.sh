@@ -95,6 +95,18 @@ if [ ! -s nginx/certs/server.crt ]; then
 fi
 
 # ---------------------------------------------------------------- start
+# the portal's ports must be free on this host (another web server often holds 80 or 443)
+port=$(grep -E '^PORTAL_PORT=' .env | cut -d= -f2); port=${port:-443}
+http_port=$(grep -E '^HTTP_PORT=' .env | cut -d= -f2); http_port=${http_port:-80}
+if ! docker compose ps --status running nginx 2> /dev/null | grep -q nginx; then
+  for p in "$port" "$http_port"; do
+    if command -v ss > /dev/null && ss -ltnH "sport = :$p" | grep -q .; then
+      warn "Port $p is already in use on this host. Set PORTAL_PORT (HTTPS) or HTTP_PORT (redirect) in .env to a free port, e.g. PORTAL_PORT=8443, then run ./install.sh again."
+      exit 1
+    fi
+  done
+fi
+
 printf '\n  Building and starting…\n'
 docker compose build -q reporter
 docker compose up -d
@@ -107,6 +119,6 @@ if docker compose exec -T reporter python report.py user list 2> /dev/null | gre
   docker compose exec reporter python report.py user add "$admin" --role admin
 fi
 
-port=$(grep -E '^PORTAL_PORT=' .env | cut -d= -f2); port=${port:-8443}
-printf '\n  Done. Open https://%s:%s and sign in.\n' "$(hostname -I 2> /dev/null | awk '{print $1}')" "$port"
+suffix=""; [ "$port" = 443 ] || suffix=":$port"
+printf '\n  Done. Open https://%s%s and sign in.\n' "$(hostname -I 2> /dev/null | awk '{print $1}')" "$suffix"
 note "The first report covers only what Proxmox keeps; uptime and restart history fill in from now on."

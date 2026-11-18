@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The portal now answers on https://server (port 443) by default, and plain http://server redirects to it. Set
+  PORTAL_PORT and HTTP_PORT in .env to use other ports.
+- Setup guide: how to fix a 403 Permission check failed.
+
 ## 0.1.0
 
 - Scheduled and on-demand PDF reports for a Proxmox VE cluster: weekly, monthly, quarterly and custom dates, each as

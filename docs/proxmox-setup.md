@@ -61,3 +61,27 @@ and its secret, and the fingerprint shown on the PBS dashboard (Show Fingerprint
 Every 5 minutes the reporter also records node, guest and storage state and quorum in `reporter/out/reporter.db`.
 That gives accurate outages, restarts and fair comparisons; Proxmox itself only keeps averages. Rows older than
 about 15 months are removed.
+
+## Troubleshooting: "403 Permission check failed (/, Sys.Audit)"
+
+The token is missing that privilege on `/`. With privilege separation on, a token gets only the privileges that
+**both** the user and the token have, so the role has to be granted twice: once to the user and once to the token.
+Check the token's effective rights on a node:
+
+```sh
+pveum user token permissions reporter@pve reports --path /
+```
+
+The list should show `Sys.Audit`, `VM.Audit` and `Datastore.Audit` at least. If it's empty, add the missing line:
+
+```sh
+pveum acl modify / --users reporter@pve --roles ReportReader
+pveum acl modify / --tokens 'reporter@pve!reports' --roles ReportReader
+```
+
+In the web UI these are two separate entries under Datacenter → Permissions: a **User Permission** for
+`reporter@pve` and an **API Token Permission** for `reporter@pve!reports`, both on path `/` with Propagate ticked.
+
+Use ReportReader or PVEAuditor, not PVESysAdmin. PVESysAdmin covers system rights only (it lacks `VM.Audit` and
+`Datastore.Audit`, so guests, storage and backups would still be refused) and adds rights to change the system that
+the reporter must not have.

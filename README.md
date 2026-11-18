@@ -28,8 +28,11 @@ You need a Linux host with Docker and the Compose plugin that can reach the Prox
    The installer asks for a name, time zone, node addresses and the token, reads each node's certificate
    fingerprint for you to confirm, makes an HTTPS certificate for the portal, builds and starts the containers, and
    creates the first admin account.
-3. Open `https://<docker-host>:8443`, sign in, and check **Settings**: email server, recipients, schedule and look.
+3. Open `https://<docker-host>`, sign in, and check **Settings**: email server, recipients, schedule and look.
 4. Press **Make report** for last week to see it straight away.
+
+The portal uses ports 443 (HTTPS) and 80 (which only redirects to HTTPS). If another web server already has them,
+set `PORTAL_PORT=8443` and/or `HTTP_PORT=8080` in `.env` (next to UID/GID) and open `https://<docker-host>:8443`.
 
 Updating: `git pull && ./install.sh` (your settings stay in `reporter/out` and `reporter/.env`).
 
