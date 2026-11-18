@@ -96,7 +96,7 @@ def user_cmd(a):
 
 def logs_cmd(a):
     from . import snapshot
-    from .pve import ApiError, pve_client
+    from .pve import ApiError, describe, pve_client
 
     try:
         client = pve_client(load_settings())
@@ -107,7 +107,10 @@ def logs_cmd(a):
     def progress(step, steps):
         print(f"\r  {100 * step // steps:3d}%", end="", flush=True)
 
-    kept, problems = snapshot.backfill(client, a.days, progress)
+    try:
+        kept, problems = snapshot.backfill(client, a.days, progress)
+    except Exception as e:  # noqa: BLE001 - a plain reason, not a traceback
+        raise SystemExit(f"Couldn't read past logs: {describe(e)}") from None
     print(f"\nKept {kept} warning and error lines")
     for p in problems:
         print(f"  {p}")

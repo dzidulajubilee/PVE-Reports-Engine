@@ -21,7 +21,7 @@ The `token add` command prints the secret once. Keep it for the installer or Set
 
 - On Proxmox VE 8, `VM.GuestAgent.Audit` doesn't exist yet: leave it out of the first command.
 - Prefer plain PVEAuditor? Use `--roles PVEAuditor` instead and skip the first command. Everything works except
-  **Errors in the logs** and the HA fencing count, which need `Sys.Syslog`.
+  **Errors in the logs**, reading past logs, and the HA fencing count, which need `Sys.Syslog`.
 - The reporter never asks for `Sys.Modify`, so it can't list pending updates. It reports a node that needs a reboot
   for an installed kernel instead (from the installed package versions).
 

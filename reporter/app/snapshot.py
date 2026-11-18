@@ -10,7 +10,7 @@ import time
 
 from . import db
 from .config import load_settings, log
-from .pve import pve_client
+from .pve import describe, pve_client
 
 INTERVAL = 300
 DAY = 86400
@@ -138,7 +138,7 @@ def backfill(client, days, progress=None, now=None):
     try:
         kept += _store_cluster_log(client.get("/cluster/log", max=10000), now, since)
     except Exception as e:  # noqa: BLE001
-        problems.append(f"cluster log: {e}")
+        problems.append(f"cluster log: {describe(e)}")
     step += 1
     for node in nodes:
         reached = None
@@ -150,7 +150,7 @@ def backfill(client, days, progress=None, now=None):
                     reached = a if reached is None else reached
                 kept += _store_journal(node, lines or [], now)
             except Exception as e:  # noqa: BLE001
-                problems.append(f"{node}: {e}")
+                problems.append(f"{node}: {describe(e)}")
                 step += days - k
                 break
             step += 1

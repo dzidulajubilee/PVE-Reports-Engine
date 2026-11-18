@@ -692,8 +692,10 @@ def _run_backfill(days, by):
                  + (f". {problems[0]}" if problems else ""), by=by, admins_only=True)
     except Exception as e:  # noqa: BLE001
         log.exception("reading past logs failed")
-        save(status="failed", error=str(e) or e.__class__.__name__, finished=time.time())
-        R.notify(f"Reading past logs failed: {e}", "error", by=by, admins_only=True)
+        from .pve import describe
+
+        save(status="failed", error=describe(e), finished=time.time())
+        R.notify(f"Reading past logs failed: {describe(e)}", "error", by=by, admins_only=True)
     finally:
         _backfill_lock.release()
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A refused API call now names the missing permission and how to fix it, in the command line, Settings and
+  notifications, instead of a traceback.
+
 - Fix: install.sh stopped silently on a re-run when .env had no PORTAL_PORT. It now says where it stops if
   anything fails.
 - install.sh can be run by any user. Without Docker access or write access to the folder it runs itself again

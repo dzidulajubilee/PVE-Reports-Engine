@@ -59,3 +59,8 @@ def test_source_counts_failures_and_permission_refusals():
     s = pve.Source(Boom())
     assert s.get("/cluster/log") is None
     assert s.errors and "/cluster/log" in s.denied
+
+
+def test_missing_permission_is_named():
+    why = pve.describe(pve.ApiError("403 Permission check failed (/, Sys.Audit)", status=403))
+    assert "Sys.Audit on /" in why and "both the user and the token" in why

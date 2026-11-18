@@ -145,7 +145,10 @@ def describe(e):
         if e.status == 401:
             return "the API token was rejected: check the token ID and secret"
         if e.status == 403:
-            return "the API token doesn't have permission for this"
+            m = re.search(r"\(([^,()]+), ([\w.]+)\)", str(e))  # Proxmox says e.g. "(/, Sys.Audit)"
+            missing = f" ({m[2]} on {m[1]})" if m else ""
+            return (f"the API token is missing a permission{missing}. With privilege separation, give the "
+                    "ReportReader role on / to both the user and the token; see docs/proxmox-setup.md")
         return str(e)
     if isinstance(e, (socket.timeout, TimeoutError)):
         return "no answer: check the address and that port 8006 is reachable"
