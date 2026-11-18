@@ -21,7 +21,7 @@ You need a Linux host with Docker and the Compose plugin that can reach the Prox
 1. On a Proxmox node, make a read-only token: three commands in [docs/proxmox-setup.md](docs/proxmox-setup.md).
 2. On the Docker host:
    ```sh
-   git clone https://github.com/<owner>/PVE-Reports-Engine.git
+   git clone https://github.com/dzidulajubilee/PVE-Reports-Engine.git
    cd PVE-Reports-Engine
    ./install.sh
    ```
