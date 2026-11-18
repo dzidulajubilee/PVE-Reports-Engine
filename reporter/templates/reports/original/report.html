@@ -1,0 +1,139 @@
+{% extends "reports/_base.html" %}
+{% set opt = {"plate": True, "lower": False, "plain": False, "list": True} %}
+{% import "reports/_pages.html" as P with context %}
+{% block margin %}64px 64px 96px{% endblock %}
+{% block footcolor %}#6f6e69{% endblock %}
+{% block style %}
+body { font-family: "IBM Plex Sans", sans-serif; color: #1b1b1a; font-size: 13px; line-height: 1.5; }
+.mono { font-family: "IBM Plex Mono", monospace; }
+.small { font-size: 12px; }
+.muted { color: #52514e; }
+.plate { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; color: #1b1b1a; border: 1px solid rgba(27,27,26,.35); border-radius: 4px; padding: 1px 6px; background: #f6f5f2; }
+.id { font-family: "IBM Plex Mono", monospace; color: #52514e; margin-right: 6px; }
+table.t { font-size: 12.5px; }
+.t th { text-align: left; font-weight: 500; color: #52514e; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid rgba(27,27,26,.35); }
+.t td { padding: 7px 8px; border-bottom: 1px solid rgba(27,27,26,.12); vertical-align: middle; }
+.t th.r { text-align: right; }
+.track { display: inline-block; vertical-align: middle; position: relative; width: 72px; height: 4px; border-radius: 2px; background: #e9e8e3; margin-right: 8px; }
+.gst .track { width: 100px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #8a8984; }
+.fill.lead { background: {{ accent }}; } .fill.bad { background: #b4432f; } .fill.warn { background: #9a6200; }
+.t-bad { color: #b4432f; } .t-warn { color: #9a6200; }
+.ptitle { font-size: 20px; font-weight: 500; line-height: 1.3; }
+.h2-mid { margin: 32px 0 12px; }
+.lede { margin: 4px 0 0; font-size: 13px; color: #52514e; max-width: 600px; }
+.h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+.sub { margin: -4px 0 8px; font-size: 12px; color: #52514e; }
+.note { margin: 6px 0 0; font-size: 12px; color: #52514e; max-width: 600px; }
+.page section { margin-top: 28px; }
+.cap section.chart { margin-top: 20px; }
+.figcap { display: flex; justify-content: space-between; font-size: 12px; color: #52514e; margin-bottom: 8px; }
+.two { display: flex; gap: 24px; } .two .col { flex: 1; min-width: 0; }
+.name { overflow-wrap: anywhere; }
+ul.changes { padding-left: 16px; font-size: 12.5px; } ul.changes li { margin-bottom: 2px; }
+.bgrid { font-size: 12.5px; table-layout: fixed; }
+.bgrid col.gcol { width: 180px; } .bgrid col.lcol { width: 140px; } .bgrid col.scol { width: 72px; }
+.bgrid th { font-size: 12px; color: #52514e; font-weight: 400; text-align: left; padding: 0 0 6px; border-bottom: 1px solid rgba(27,27,26,.35); }
+.bgrid th.c { text-align: center; } .bgrid th.r { text-align: right; }
+.bgrid td { padding: 5px 0; border-bottom: 1px solid rgba(27,27,26,.10); overflow: hidden; }
+.bgrid td.name { white-space: nowrap; }
+.bgrid .led { width: 14px; height: 10px; }
+.bgrid .led.ok, .legend .led.ok { background: {{ accent }}; }
+.bgrid .led.bad, .legend .led.bad { background: #b4432f; }
+.bgrid .led.none, .legend .led.none { width: 12px; height: 8px; border-color: #8a8984; }
+.bgrid .latest { padding-left: 12px; }
+.legend { margin-top: 8px; font-size: 12px; color: #52514e; } .legend > span { margin-right: 20px; } .legend .led { margin-right: 6px; }
+.health { font-size: 12.5px; }
+.health td { padding: 6px 0; border-bottom: 1px solid rgba(27,27,26,.10); }
+.health .hc { width: 18px; } .health .hs { color: #52514e; } .health .gap { width: 32px; border-bottom: 0; }
+.health .led, .dot { width: 8px; height: 8px; border-radius: 4px; }
+.led.ok { background: #2f7a4a; } .led.warn { background: #9a6200; } .led.bad { background: #b4432f; }
+.datanote { margin-top: 20px; font-size: 12px; color: #52514e; border: 1px dashed rgba(27,27,26,.25); border-radius: 8px; padding: 10px 14px; }
+
+/* page 1 */
+.hdr { display: flex; justify-content: space-between; align-items: flex-start; }
+.org { font-size: 13px; color: #52514e; margin-bottom: 4px; }
+h1 { font-size: 30px; line-height: 1.15; font-weight: 500; }
+.meta { font-family: "IBM Plex Mono", monospace; margin-top: 8px; padding-bottom: 16px; border-bottom: 1px solid rgba(27,27,26,.22); font-size: 12px; color: #52514e; }
+.lines { margin-top: 24px; } .lines p { font-size: 14px; line-height: 1.6; max-width: 600px; } .lines p + p { margin-top: 8px; }
+.att { margin-top: 20px; border: 1px solid rgba(27,27,26,.22); border-radius: 8px; padding: 16px 20px; }
+.att h2 { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.att ul { list-style: none; padding: 0; }
+.att li { display: flex; align-items: baseline; margin-bottom: 6px; } .att li:last-child { margin-bottom: 0; }
+.att .odot { width: 8px; height: 8px; border-radius: 4px; margin-right: 10px; flex: none; }
+.figs { margin-top: 24px; display: flex; gap: 16px; }
+.figs > div { flex: 1; border-top: 1px solid rgba(27,27,26,.22); padding-top: 9px; }
+.figs > div.lead { border-top: 2px solid {{ accent }}; padding-top: 8px; }
+.figs .l, .figs .c2 { font-size: 12px; color: #52514e; }
+.figs .v { margin: 2px 0 0; font-size: 24px; font-weight: 500; } .figs .v span { font-size: 14px; color: #52514e; }
+.nodes { margin-top: 32px; }
+.nodes .top { display: flex; justify-content: space-between; align-items: baseline; }
+.nodes h2 { font-size: 16px; font-weight: 500; margin-bottom: 12px; }
+.nodes .key { font-size: 12px; color: #52514e; }
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card { width: 210px; box-sizing: border-box; border: 1px solid rgba(27,27,26,.16); border-radius: 8px; padding: 16px; break-inside: avoid; }
+.card .ch { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.card .up { font-size: 12px; color: #52514e; } .card .up .dot { display: inline-block; background: #2f7a4a; margin-right: 6px; }
+.card .up .dot.off { background: #b4432f; }
+.bar { margin-bottom: 12px; }
+.bar .bl { display: flex; justify-content: space-between; font-size: 12px; } .bar .bl span:first-child { color: #52514e; }
+.btrack { position: relative; height: 6px; border-radius: 3px; background: #e9e8e3; margin-top: 4px; }
+.bfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: {{ accent }}; }
+.bfill.hot { background: #b4432f; }
+.bpeak { position: absolute; top: -3px; width: 2px; height: 12px; background: #1b1b1a; }
+.card .foot { border-top: 1px solid rgba(27,27,26,.10); padding-top: 8px; font-size: 12px; color: #52514e; }
+.card .foot span { display: block; }
+.slot { width: 120px; height: 36px; }
+{% endblock %}
+
+{% macro bar(label, avg, peak, text, hot=False) -%}
+<div class="bar"><div class="bl"><span>{{ label }}</span><span class="mono">{{ text }}</span></div>
+<div class="btrack"><div class="bfill {{ 'hot' if hot }}" style="width:{{ [avg or 0, 100]|min }}%"></div>{% if peak is not none %}<div class="bpeak" style="left:{{ [[peak - 0.5, 0]|max, 99]|min }}%"></div>{% endif %}</div></div>
+{%- endmacro %}
+
+{% block body %}
+<section class="summary">
+  <div class="hdr">
+    <div>
+      <p class="org">{{ name or "Proxmox" }} · {{ cluster }}</p>
+      <h1>{{ kind|capitalize if kind != "custom" else "" }}{{ " cluster report, " if kind != "custom" else "Cluster report, " }}{{ week_word }}</h1>
+    </div>
+    {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
+  </div>
+  <p class="meta">{{ dates if kind != "custom" else title }} · {{ v.nodes|length }} node{{ 's' if v.nodes|length != 1 }} · {{ d.guests.total }} guests · made {{ generated.strftime('%-d %b %H:%M') }}</p>
+
+  <div class="lines"><p>{{ v.headline }}</p><p class="muted">{{ v.subline }}</p></div>
+
+  {% if v.attention %}
+  <section class="att keep">
+    <h2 class="head">Needs attention</h2>
+    <ul>{% for a in v.attention[:6] %}<li><span class="led odot {{ a.level }}"></span><span>{{ a.text }}{% if a.aside and a.aside != "page 4" %}. <span class="muted">{{ a.aside[0]|upper }}{{ a.aside[1:] }}</span>{% endif %}</span></li>{% endfor %}</ul>
+    {% if v.attention|length > 6 %}<p class="note" style="margin-top:8px">Also: {{ v.attention[6:]|map(attribute="short")|join("; ") }}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="figs keep">
+    {% for f in v.figs %}
+    <div class="{{ 'lead' if loop.first }}"><p class="l">{{ f.label }}</p><p class="v">{{ f.value }}{% if f.of %} <span>{{ f.of }}</span>{% endif %}</p><p class="c2 {{ 't-' ~ f.tone if f.tone }}">{{ f.change or " " }}</p></div>
+    {% endfor %}
+  </section>
+
+  <section class="nodes flow">
+    <div class="top"><h2 class="head">Nodes</h2><p class="key">bar = average · tick = peak</p></div>
+    <div class="cards">
+      {% for n in v.nodes %}
+      <div class="card">
+        <div class="ch"><span class="plate">{{ n.name }}</span><span class="up"><span class="dot {{ 'off' if not n.online }}"></span>{{ ("up " ~ n.up_long) if n.online else "offline" }}</span></div>
+        {{ bar("CPU", n.cpu_avg, n.cpu_max, n.cpu_text) }}
+        {{ bar("Memory", n.mem_avg, n.mem_max, n.mem_text, n.mem_hot) }}
+        {{ bar("Local storage", n.local_pct, none, n.local_text, n.local_hot) }}
+        <div class="foot"><span>{{ n.guests_text }}</span><span class="mono">PVE {{ n.pve or "–" }}{% if n.kernel %} · kernel {{ n.kernel.replace("-pve", "").rsplit("-", 1)[0] }}{% endif %}</span>
+          {% if n.reboot %}<span class="t-warn">Reboot needed for the new kernel</span>{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {{ P.notes() }}
+</section>
+{{ P.rest() }}
+{% endblock %}

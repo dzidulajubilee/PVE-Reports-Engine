@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block body %}
+<style>
+.sections { display: grid; gap: 24px; max-width: 820px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0 16px; }
+.panel p.intro { color: var(--ink-2); margin: -4px 0 16px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.panel-head h2, .panel-head .check { margin: 0; }
+.bar { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.bar .field { flex: 1; min-width: 220px; margin: 0; }
+.recips { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px 12px; align-items: center; }
+.recips .col { font-size: 13px; color: var(--ink-2); }
+.incl { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.incl-row { align-items: flex-start; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--rule); }
+.incl-row input { margin-top: 2px; }
+.flip { display: inline-grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule-2); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+.flip button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0; padding: 7px 20px; cursor: pointer; transition: background-color .15s, color .15s; }
+.flip button + button { border-left: 1px solid var(--rule); }
+.flip button[aria-selected="true"] { background: var(--rule); color: var(--ink); font-weight: 500; }
+textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; font-size: 12px; }
+.test-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.result { font-size: 13px; color: var(--ink-2); }
+.result.ok { color: var(--ok); } .result.bad { color: var(--bad); }
+.status { font-size: 13px; color: var(--ink-3); }
+/* report looks: page 1 of each template as a small preview */
+.looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.look { position: relative; margin: 0; border: 1px solid var(--rule-2); border-radius: 12px; padding: 8px; cursor: pointer;
+        transition: border-color .15s, background-color .15s; color: var(--ink); }
+.look:hover { background: var(--rule); }
+.look input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.look:has(input:checked) { border-color: var(--ink); background: var(--rule); }
+.look:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.look img { display: block; width: 100%; aspect-ratio: 210 / 297; object-fit: cover; object-position: top; border-radius: 4px; background: #fff; border: 1px solid var(--rule); }
+.look .ln { display: block; margin-top: 8px; font-weight: 500; font-size: 14px; }
+.look .lf { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.accent-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.sw { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--rule-2); cursor: pointer; padding: 0; transition: transform .1s; }
+.sw:active { transform: scale(.96); }
+.sw[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+#accent { width: 120px; font-family: PlexMono, ui-monospace, monospace; }
+.logo-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 16px; }
+.logo-tile { flex: none; width: 180px; height: 56px; padding: 8px; background: #ffffff; border: 1px solid var(--rule-2); border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; }
+.logo-tile img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.logo-tile span { width: 100%; text-align: center; font-size: 12px; color: #85847f; }
+@media (max-width: 720px) { .looks { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid2, .grid3, .incl { grid-template-columns: 1fr; } .recips { grid-template-columns: 1fr; } .recips .col { display: none; } }
+</style>
+
+<h1>Settings</h1>
+<p class="lede">The Proxmox connection, what reports contain, how they look, who gets them and when</p>
+
+<form method="post" class="sections" enctype="multipart/form-data" id="settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <section class="panel">
+    <div class="panel-head"><h2>Proxmox cluster</h2>
+      <span class="status">{% if last_snapshot %}Last read {{ fmt(last_snapshot) }}{% elif s.pve.hosts %}Not read yet{% endif %}</span></div>
+    <p class="intro">A read-only API token. The setup guide (docs/proxmox-setup.md) has the three commands that make one with the ReportReader role</p>
+    <div class="field"><label for="pve_hosts">Node addresses</label>
+      <input type="text" id="pve_hosts" name="pve_hosts" value="{{ s.pve.hosts|join(', ') }}" placeholder="pve1.example.lan, pve2.example.lan:8006">
+      <div class="hint">Two or more, separated by commas. When one is down the next is used</div></div>
+    <div class="grid2">
+      <div class="field"><label for="pve_token_id">Token ID</label><input type="text" id="pve_token_id" name="pve_token_id" value="{{ s.pve.token_id }}" placeholder="reporter@pve!reports" autocomplete="off"></div>
+      <div class="field"><label for="pve_token_secret">Token secret</label><input type="password" id="pve_token_secret" name="pve_token_secret" autocomplete="new-password" placeholder="{{ 'Saved, leave blank to keep' if has_pve_secret else '' }}"></div>
+    </div>
+    <div class="field"><label for="pve_ca_pem">Cluster CA</label>
+      <textarea id="pve_ca_pem" name="pve_ca_pem" placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----">{{ s.pve.ca_pem }}</textarea>
+      <div class="hint">The contents of /etc/pve/pve-root-ca.pem on any node. Or leave it empty and give the certificate fingerprint below</div></div>
+    <div class="field"><label for="pve_fingerprint">Or certificate fingerprints (SHA-256)</label>
+      <input type="text" id="pve_fingerprint" name="pve_fingerprint" value="{{ s.pve.fingerprint }}" class="mono" placeholder="AB:CD:…">
+      <div class="hint">In the Proxmox web UI: node → System → Certificates → pveproxy-ssl.pem. One per node, separated by commas. install.sh fills these in for you</div></div>
+    <div class="test-row"><button type="button" class="btn quiet small" data-test="pve">Test connection</button><span class="result" id="pve-result"></span></div>
+    {% if snapshot_error %}<p class="hint" style="color:var(--bad)">Last problem: {{ snapshot_error.split(' ', 1)[1] if ' ' in snapshot_error else snapshot_error }}</p>{% endif %}
+    <div class="field" style="margin:16px 0 0"><label for="pve_url">Proxmox web address for links in the PDFs</label>
+      <input type="text" id="pve_url" name="pve_url" value="{{ s.general.pve_url }}" placeholder="https://pve1.example.lan:8006">
+      <label class="check" style="margin-top:8px"><input type="checkbox" name="pve_links" {{ 'checked' if s.general.pve_links }}> Link section headings to the Proxmox web UI</label></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Proxmox Backup Server</h2>
+      <label class="check"><input type="checkbox" name="pbs_enabled" id="pbs_on" {{ 'checked' if s.pbs.enabled }}> Include</label></div>
+    <div id="pbs-body" {{ 'hidden' if not s.pbs.enabled }}>
+      <p class="intro">Datastore use and when it fills up, and verify, prune and garbage-collection runs. A token with the Audit role on / is enough</p>
+      <div class="field"><label for="pbs_url">Address</label><input type="text" id="pbs_url" name="pbs_url" value="{{ s.pbs.url }}" placeholder="https://pbs.example.lan:8007"></div>
+      <div class="grid2">
+        <div class="field"><label for="pbs_token_id">Token ID</label><input type="text" id="pbs_token_id" name="pbs_token_id" value="{{ s.pbs.token_id }}" placeholder="reporter@pbs!reports" autocomplete="off"></div>
+        <div class="field"><label for="pbs_token_secret">Token secret</label><input type="password" id="pbs_token_secret" name="pbs_token_secret" autocomplete="new-password" placeholder="{{ 'Saved, leave blank to keep' if has_pbs_secret else '' }}"></div>
+      </div>
+      <div class="field"><label for="pbs_ca_pem">CA certificate</label><textarea id="pbs_ca_pem" name="pbs_ca_pem" placeholder="-----BEGIN CERTIFICATE-----">{{ s.pbs.ca_pem }}</textarea></div>
+      <div class="field"><label for="pbs_fingerprint">Or certificate fingerprint (SHA-256)</label><input type="text" id="pbs_fingerprint" name="pbs_fingerprint" value="{{ s.pbs.fingerprint }}" class="mono">
+        <div class="hint">Shown on the PBS dashboard under Show Fingerprint</div></div>
+      <div class="test-row"><button type="button" class="btn quiet small" data-test="pbs">Test connection</button><span class="result" id="pbs-result"></span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Report look</h2>
+    <p class="intro">One look for every report. Each has its own accent colour; status colours stay the same in all of them</p>
+    <div class="looks" role="radiogroup" aria-label="Report template">
+      {% for key, t in templates.items() %}
+      <label class="look"><input type="radio" name="template" value="{{ key }}" {{ 'checked' if key == template }}>
+        <img src="{{ url_for('static', filename='previews/' ~ key ~ '.png') }}" alt="Page 1 of the {{ t.label }} report" loading="lazy">
+        <span class="ln">{{ t.label }}</span><span class="lf">{{ t.for }}</span></label>
+      {% endfor %}
+    </div>
+    <div class="accent-row">
+      <label for="accent" style="margin:0 8px 0 0">Accent</label>
+      <input type="text" id="accent" name="accent" value="{{ accent }}" pattern="#[0-9a-fA-F]{6}">
+      {% for c in accents %}<button type="button" class="sw" style="background:{{ c }}" data-c="{{ c }}" aria-label="Use {{ c }}"></button>{% endfor %}
+    </div>
+    <div class="hint">Used for charts and the main bars. A darker shade of it is used for text so it stays readable</div>
+    <label for="logo" style="margin-top:16px">Logo</label>
+    <div class="logo-row" style="margin-top:0">
+      <div class="logo-tile">{% if logo_version %}<img src="{{ url_for('logo_preview', v=logo_version) }}" alt="Current logo">{% else %}<span>No logo</span>{% endif %}</div>
+      <div style="flex:1;min-width:220px">
+        <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
+        <div class="hint">PNG, JPEG or SVG up to 1 MB, shown on the first page</div>
+        {% if logo_version %}<label class="check" style="margin-top:8px"><input type="checkbox" name="remove_logo"> Remove the logo</label>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Name and time zone</h2>
+    <div class="grid2">
+      <div class="field"><label for="name">Name on reports and this portal</label><input type="text" id="name" name="name" maxlength="60" value="{{ s.general.name }}" placeholder="Reports"></div>
+      <div class="field"><label for="timezone">Time zone</label>
+        <input type="text" id="timezone" name="timezone" list="tzlist" value="{{ s.general.timezone }}" autocomplete="off" required>
+        <datalist id="tzlist">{% for z in timezones %}<option value="{{ z }}">{% endfor %}</datalist>
+        <div class="hint">A week runs Monday 00:00 to Sunday 24:00 in this zone</div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>What to include</h2>
+    <p class="intro">Page 1 (summary, needs attention, headline numbers) is always there. Needs attention covers everything, so the summary still warns about a problem whose section it leaves out</p>
+    <div class="flip" role="tablist" aria-label="Report version">
+      <button type="button" role="tab" id="tab-full" aria-controls="incl-full" aria-selected="true">Full report</button>
+      <button type="button" role="tab" id="tab-summary" aria-controls="incl-summary" aria-selected="false">Summary</button>
+    </div>
+    {% for version, prefix, chosen in [('full', 'sec', s.sections), ('summary', 'sum', s.sections_summary)] %}
+    <div class="incl" id="incl-{{ version }}" role="tabpanel" aria-labelledby="tab-{{ version }}" {{ 'hidden' if version == 'summary' }}>
+      {% for key, label, desc in sections %}
+      <label class="check incl-row"><input type="checkbox" name="{{ prefix }}_{{ key }}" {{ 'checked' if chosen.get(key, version == 'full') }}>
+        <span><span style="display:block">{{ label }}</span><span class="hint" style="display:block;margin:0">{{ desc }}</span></span></label>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <div class="grid2" style="margin-top:16px">
+      <div class="field"><label for="storage_warn">Storage counts as filling up from</label><input type="number" id="storage_warn" name="storage_warn" min="50" max="99" value="{{ s.general.storage_warn }}"><div class="hint">% used, or due to fill within 30 days</div></div>
+      <div class="field"><label for="snapshot_days">List snapshots older than</label><input type="number" id="snapshot_days" name="snapshot_days" min="1" max="3650" value="{{ s.general.snapshot_days }}"><div class="hint">days</div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Email server</h2>
+    <div class="grid3">
+      <div class="field"><label for="host">SMTP server</label><input type="text" id="host" name="host" value="{{ s.smtp.host }}" placeholder="smtp.example.com"></div>
+      <div class="field"><label for="port">Port</label><input type="number" id="port" name="port" value="{{ s.smtp.port }}"></div>
+      <div class="field"><label for="sec">Security</label>
+        <select id="sec" name="security">{% for v, l in [('starttls','STARTTLS'),('ssl','SSL/TLS'),('none','None')] %}<option value="{{ v }}" {{ 'selected' if s.smtp.security == v }}>{{ l }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="user">Username</label><input type="text" id="user" name="user" value="{{ s.smtp.user }}" autocomplete="off"></div>
+      <div class="field"><label for="pw">Password</label><input type="password" id="pw" name="password" autocomplete="new-password" placeholder="{{ 'Saved, leave blank to keep' if has_password else '' }}">
+        {% if has_password %}<label class="check" style="margin-top:6px;font-size:13px"><input type="checkbox" name="clear_password"> Remove saved password</label>{% endif %}</div>
+    </div>
+    <div class="field" style="margin:0"><label for="from">Send as</label><input type="text" id="from" name="from" value="{{ s.smtp.from }}" placeholder="Cluster reports &lt;reports@example.com&gt;"></div>
+    <label class="check" style="margin-top:16px"><input type="checkbox" name="smtp_verify" {{ 'checked' if s.smtp.get('verify', True) }}> Check the mail server's certificate</label>
+    <div class="hint">Untick only for an internal mail server with its own self-signed certificate</div>
+  </section>
+
+  <section class="panel">
+    <h2>Who gets each report</h2>
+    <p class="intro">Separate addresses with commas; leave a box empty to send nothing</p>
+    <div class="recips">
+      <span></span><span class="col">Full report</span><span class="col">Summary only</span>
+      {% for k, l in [('weekly','Weekly'),('monthly','Monthly'),('quarterly','Quarterly')] %}
+      <span>{{ l }}</span>
+      <input type="text" name="to_{{ k }}" value="{{ s.recipients[k] }}" aria-label="{{ l }} full report recipients" placeholder="IT team">
+      <input type="text" name="to_s_{{ k }}" value="{{ s.recipients_summary[k] }}" aria-label="{{ l }} summary recipients" placeholder="Management">
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Schedule</h2>
+    <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if s.schedule.enabled }}> Make reports automatically</label>
+    <div style="margin:8px 0 16px 38px">
+      {% for k, l in [('weekly','Weekly, every Monday'),('monthly','Monthly, on the 1st'),('quarterly','Quarterly, on 1 Jan, Apr, Jul and Oct')] %}
+      <label class="check"><input type="checkbox" name="auto_{{ k }}" {{ 'checked' if k in s.schedule.kinds }}> {{ l }}</label>
+      {% endfor %}
+    </div>
+    <div class="field" style="max-width:220px;margin:0"><label for="hour">Send at</label>
+      <select id="hour" name="hour">{% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if s.schedule.hour == h }}>{{ '%02d:00'|format(h) }}</option>{% endfor %}</select>
+      <div class="hint">Local time, {{ tz }}</div></div>
+  </section>
+
+  <section class="panel">
+    <div class="bar">
+      <button class="btn primary" name="action" value="save">Save settings</button>
+      <span class="muted">or</span>
+      <div class="field"><label for="tt">Save and send a test email to</label><input type="text" id="tt" name="test_to" placeholder="you@example.com"></div>
+      <button class="btn quiet" name="action" value="test">Send test</button>
+    </div>
+  </section>
+</form>
+<script>
+const form = document.getElementById('settings');
+document.querySelectorAll('[data-test]').forEach(btn => btn.addEventListener('click', async () => {
+  const product = btn.dataset.test, out = document.getElementById(product + '-result');
+  btn.disabled = true; out.className = 'result'; out.textContent = 'Testing…';
+  try {
+    const r = await (await fetch('/settings/test/' + product, {method: 'POST', body: new FormData(form)})).json();
+    out.className = 'result ' + (r.ok ? 'ok' : 'bad'); out.textContent = r.message;
+  } catch (e) { out.className = 'result bad'; out.textContent = 'The portal didn\'t answer'; }
+  finally { btn.disabled = false; }
+}));
+const pbsOn = document.getElementById('pbs_on');
+pbsOn.addEventListener('change', () => { document.getElementById('pbs-body').hidden = !pbsOn.checked; });
+// each template remembers its own accent
+const accents = {{ all_accents|tojson }};
+const accent = document.getElementById('accent');
+const swatches = document.querySelectorAll('.sw');
+function mark() { swatches.forEach(s => s.setAttribute('aria-pressed', String(s.dataset.c === accent.value.toLowerCase()))); }
+swatches.forEach(s => s.addEventListener('click', () => { accent.value = s.dataset.c; mark(); }));
+accent.addEventListener('input', mark);
+document.querySelectorAll('input[name=template]').forEach(r => r.addEventListener('change', () => { accent.value = accents[r.value]; mark(); }));
+mark();
+const tabs = document.querySelectorAll('.flip [role="tab"]');
+tabs.forEach(tab => tab.addEventListener('click', () => {
+  tabs.forEach(t => { const on = t === tab; t.setAttribute('aria-selected', String(on)); document.getElementById(t.getAttribute('aria-controls')).hidden = !on; });
+}));
+</script>
+{% endblock %}

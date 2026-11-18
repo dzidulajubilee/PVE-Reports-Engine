@@ -1,0 +1,95 @@
+{% extends "reports/_base.html" %}
+{% set opt = {"plate": False, "lower": False, "plain": True, "list": False} %}
+{% import "reports/_pages.html" as P with context %}
+{% block margin %}72px 80px 96px{% endblock %}
+{% block footfont %}"Inter", sans-serif{% endblock %}
+{% block footcolor %}#6b7487{% endblock %}
+{% block style %}
+body { font-family: "Inter", sans-serif; color: #111827; font-size: 13px; line-height: 20px; }
+.serif { font-family: "Newsreader", Georgia, serif; }
+.mono { font-family: "Inter", sans-serif; }
+.small { font-size: 12px; }
+.muted { color: #4b5565; }
+.id { color: #6b7487; margin-right: 8px; font-size: 12px; }
+table.t { font-size: 13px; }
+.t th { text-align: left; font-weight: 500; color: #4b5565; font-size: 12px; padding: 4px 8px 8px; border-bottom: 1px solid rgba(17,24,39,.28); }
+.t td { padding: 8px; border-bottom: 1px solid rgba(17,24,39,.10); }
+.t th:first-child, .t td:first-child { padding-left: 0; } .t th:last-child, .t td:last-child { padding-right: 0; }
+.t th.r { text-align: right; }
+.track { display: inline-block; vertical-align: middle; position: relative; width: 72px; height: 4px; border-radius: 2px; background: #e5e7eb; margin-right: 8px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #6b7487; }
+.fill.lead { background: {{ accent }}; } .fill.bad { background: {{ bad }}; } .fill.warn { background: {{ warn }}; }
+.ptitle { font-family: "Newsreader", Georgia, serif; font-size: 30px; line-height: 36px; font-weight: 400; }
+.h2-mid { margin: 40px 0 12px; font-size: 24px; line-height: 32px; }
+.lede { margin: 12px 0 0; font-size: 15px; line-height: 24px; color: #4b5565; max-width: 560px; }
+.h3 { margin: 0 0 4px; font-size: 14px; line-height: 20px; font-weight: 500; }
+.sub { margin: 0 0 8px; font-size: 12px; line-height: 16px; color: #4b5565; }
+.note { margin: 8px 0 0; font-size: 12px; line-height: 16px; color: #4b5565; max-width: 560px; }
+.page section { margin-top: 32px; }
+.figcap { display: flex; justify-content: space-between; font-size: 12px; color: #4b5565; margin-bottom: 8px; }
+.two { display: flex; gap: 32px; } .two .col { flex: 1; min-width: 0; }
+.name { overflow-wrap: anywhere; } .when { width: 104px; }
+.bgrid { font-size: 13px; table-layout: fixed; }
+.bgrid col.gcol { width: 168px; } .bgrid col.lcol { width: 132px; } .bgrid col.scol { width: 64px; }
+.bgrid th { font-size: 12px; color: #4b5565; font-weight: 400; text-align: left; padding: 0 0 8px; border-bottom: 1px solid rgba(17,24,39,.28); }
+.bgrid th.c { text-align: center; } .bgrid th.r { text-align: right; }
+.bgrid td { height: 30px; padding: 0; border-bottom: 1px solid rgba(17,24,39,.10); overflow: hidden; }
+.bgrid td.name { white-space: nowrap; } .bgrid .latest { padding-left: 16px; }
+.bgrid .led, .legend .led, .health .led { width: 10px; height: 10px; border-radius: 5px; }
+.legend { margin-top: 12px; font-size: 12px; color: #4b5565; } .legend > span { margin-right: 24px; } .legend .led { margin-right: 6px; }
+.why td { padding: 8px 0; } .whycol { width: 200px; }
+.health { border-top: 1px solid rgba(17,24,39,.10); }
+.health td { height: 36px; border-bottom: 1px solid rgba(17,24,39,.10); padding: 0; }
+.health .hc { width: 22px; } .health .hs { font-size: 12px; color: #4b5565; } .health .gap { width: 32px; border-bottom: 0; }
+.datanote { margin-top: 32px; font-size: 12px; line-height: 16px; color: #4b5565; }
+
+/* page 1 */
+.kicker { font-size: 12px; line-height: 16px; color: #4b5565; display: flex; justify-content: space-between; align-items: flex-start; }
+h1 { margin-top: 24px; font-family: "Newsreader", Georgia, serif; font-size: 40px; line-height: 48px; font-weight: 400; max-width: 600px; }
+.intro { margin-top: 16px; font-size: 15px; line-height: 24px; color: #4b5565; max-width: 560px; }
+.areas { margin-top: 40px; border-top: 1px solid rgba(17,24,39,.28); }
+.areas td { padding: 16px 0; border-bottom: 1px solid rgba(17,24,39,.10); vertical-align: baseline; }
+.areas .an { width: 132px; font-weight: 500; } .areas .av { width: 88px; } .areas .at { color: #4b5565; padding-right: 16px; }
+.areas .ax { width: 88px; text-align: right; font-family: "Newsreader", Georgia, serif; font-size: 24px; line-height: 28px; }
+.light { display: inline-block; width: 10px; height: 10px; border-radius: 5px; margin-right: 8px; }
+.light.ok { background: {{ ok }}; } .light.warn { background: {{ warn }}; } .light.bad { background: {{ bad }}; }
+.rec { margin-top: 40px; }
+.rec h2 { font-family: "Newsreader", Georgia, serif; font-size: 24px; line-height: 32px; font-weight: 400; margin-bottom: 16px; }
+.rec ol { list-style: none; padding: 0; }
+.rec li { display: flex; margin-bottom: 16px; }
+.rec .num { width: 40px; flex: none; font-family: "Newsreader", Georgia, serif; font-size: 20px; line-height: 24px; color: {{ accent }}; }
+.rec .rt { font-weight: 500; } .rec .rw { margin-top: 4px; color: #4b5565; }
+.next { margin-top: 24px; font-size: 12px; line-height: 16px; color: #4b5565; }
+{% endblock %}
+
+{% block body %}
+<section class="summary">
+  <div class="kicker"><span>{{ name or "Proxmox" }} · {{ cluster }} · {{ title }}{% if kind in ("weekly", "quarterly") %}, {{ dates }}{% endif %}</span>{% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}</div>
+  <h1>{{ v.verdict }}</h1>
+  <p class="intro">{{ v.plain_line }}</p>
+
+  <section class="keep">
+    <table class="areas">
+      {% for a in v.areas %}
+      <tr><td class="an">{{ a.name }}</td><td class="av"><span class="light {{ a.tone }}"></span>{{ a.verdict }}</td><td class="at">{{ a.text }}</td><td class="ax">{{ a.number }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  {% if v.recommend %}
+  <section class="rec keep">
+    <h2 class="head">What we recommend</h2>
+    <ol>
+      {% for r in v.recommend %}
+      <li><span class="num">{{ loop.index }}</span><div><p class="rt">{{ r.title }}</p><p class="rw">{{ r.why }}</p></div></li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% else %}
+  <section class="rec keep"><h2 class="head">What we recommend</h2><p class="muted">Nothing needs doing. Keep the schedule as it is.</p></section>
+  {% endif %}
+  {% if style == "full" and on %}<p class="next">Details for each area follow on the next pages</p>{% endif %}
+  {{ P.notes() }}
+</section>
+{{ P.rest() }}
+{% endblock %}

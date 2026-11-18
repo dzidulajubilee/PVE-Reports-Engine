@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block body %}
+<style>
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.row-actions form { margin: 0; }
+.row-actions select { width: auto; padding: 4px 8px; font-size: 13px; }
+.state { font-size: 12px; }
+.secret { font-family: PlexMono, ui-monospace, monospace; font-size: 18px; letter-spacing: .02em; padding: 12px; background: var(--bg); border: 1px solid var(--rule-2); border-radius: 8px; margin: 8px 0; user-select: all; }
+.roles td, .roles th { font-size: 13px; padding: 6px 8px 6px 0; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .hide-sm { display: none; } }
+</style>
+<h1>Users</h1>
+<p class="lede">Accounts for this portal only; they don't touch Proxmox</p>
+{% if shown %}
+<div class="panel" style="margin-bottom:24px;border-color:var(--accent)">
+  <h2>One-time password for {{ shown[0] }}</h2>
+  <p class="muted" style="margin:0">Hand this over in person or another private channel. It's shown once and must be changed at first sign-in</p>
+  <p class="secret">{{ shown[1] }}</p>
+  <a class="btn quiet small" href="{{ url_for('users_page') }}">Done</a>
+</div>
+{% endif %}
+<div class="layout">
+  <div>
+    <div class="panel">
+      <table>
+        <tr><th>User</th><th>Role</th><th class="hide-sm">Last sign-in</th><th></th></tr>
+        {% for u in rows %}
+        <tr>
+          <td>{{ u.username }}{% if u.display %} <span class="muted">· {{ u.display }}</span>{% endif %}
+            <div class="state muted">{% if not u.active %}<span style="color:var(--bad)">Deactivated</span>{% elif u.lock_until > now %}<span style="color:var(--bad)">Locked</span>{% elif u.must_change %}Must choose a password{% else %}Active{% endif %}</div></td>
+          <td>
+            <form method="post" style="margin:0" class="row-actions" onchange="this.submit()">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="role"><input type="hidden" name="uid" value="{{ u.id }}">
+              <select name="role" aria-label="Role of {{ u.username }}" {{ 'disabled' if u.id == me_id }}>{% for k, l in roles.items() %}<option value="{{ k }}" {{ 'selected' if u.role == k }}>{{ l }}</option>{% endfor %}</select>
+            </form>
+          </td>
+          <td class="hide-sm muted mono">{{ fmt(u.last_login) }}</td>
+          <td><div class="row-actions">
+            {% for action, label, show in [("reset", "Reset password", True), ("unlock", "Unlock", u.lock_until > now), ("everywhere", "Sign out", u.id != me_id), ("deactivate", "Deactivate", u.active and u.id != me_id), ("activate", "Reactivate", not u.active), ("delete", "Delete", u.id != me_id)] if show %}
+            <form method="post" {% if action == "delete" %}onsubmit="return confirm('Delete {{ u.username }}?')"{% endif %}>
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ action }}"><input type="hidden" name="uid" value="{{ u.id }}">
+              <button class="btn {{ 'link' if action == 'delete' else 'quiet' }} small">{{ label }}</button>
+            </form>
+            {% endfor %}
+          </div></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="panel" style="margin-top:24px">
+      <h2>Recent changes</h2>
+      {% if audit %}
+      <table>{% for a in audit %}<tr><td class="mono muted" style="width:150px">{{ fmt(a.t) }}</td><td>{{ a.actor }} {{ a.action }} {{ a.target }}</td></tr>{% endfor %}</table>
+      {% else %}<p class="muted" style="margin:0">Nothing yet</p>{% endif %}
+    </div>
+  </div>
+  <div>
+    <form method="post" class="panel" autocomplete="off">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">
+      <h2>Add a user</h2>
+      <div class="field"><label for="un">Username</label><input id="un" name="username" type="text" required></div>
+      <div class="field"><label for="dn">Name</label><input id="dn" name="display" type="text"></div>
+      <div class="field"><label for="em">Email</label><input id="em" name="email" type="email"></div>
+      <div class="field"><label for="ro">Role</label><select id="ro" name="role">{% for k, l in roles.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="pw">Temporary password</label><input id="pw" name="password" type="password" autocomplete="new-password" minlength="12"><div class="hint">Leave empty and the portal makes a one-time password to hand over. Either way they choose their own at first sign-in</div></div>
+      <button class="btn primary" style="width:100%">Add user</button>
+    </form>
+    <div class="panel" style="margin-top:24px">
+      <h2>What each role can do</h2>
+      <table class="roles">
+        <tr><th></th><th>Viewer</th><th>Operator</th><th>Admin</th></tr>
+        <tr><td>See and download reports</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Make reports</td><td></td><td>✓</td><td>✓</td></tr>
+        <tr><td>Email, schedule, delete</td><td></td><td></td><td>✓</td></tr>
+        <tr><td>Settings and users</td><td></td><td></td><td>✓</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

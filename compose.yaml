@@ -1,0 +1,20 @@
+# PVE Reports Engine: the reporter and nginx in front of it for HTTPS.
+# install.sh sets everything up; afterwards: docker compose up -d
+services:
+  reporter:
+    image: ${REPORTER_IMAGE:-pve-reports-engine/reporter:local}  # built here; set REPORTER_IMAGE in .env to pull a published one
+    build: ./reporter
+    restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"   # never root
+    env_file: [./reporter/.env]
+    volumes: [./reporter/out:/out]      # all state: settings, reporter.db, PDFs
+    # no ports published: nginx serves it over HTTPS
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["${PORTAL_PORT:-8443}:8443"]
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on: [reporter]

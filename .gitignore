@@ -1,0 +1,14 @@
+# Runtime data: settings with secrets, the database, PDFs
+reporter/out/*
+!reporter/out/.gitkeep
+# certificates written by install.sh (with the private key)
+nginx/certs/*
+!nginx/certs/.gitkeep
+# real settings and credentials: copy .env.example to .env and edit that
+*/.env
+/.env
+*.bak
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+preview/

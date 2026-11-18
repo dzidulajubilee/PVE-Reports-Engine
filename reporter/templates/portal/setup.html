@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Set up{% endblock %}
+{% block body %}
+<div style="max-width:420px;margin:8vh auto 0">
+  <h1>Create the first admin</h1>
+  <p class="lede">There are no accounts yet. The setup code is in the reporter's log: <span class="mono">docker compose logs reporter | grep "setup code"</span></p>
+  <form method="post" class="panel" autocomplete="off">
+    {% if error %}<p class="flash" style="border-color:var(--bad)">{{ error }}</p>{% endif %}
+    <div class="field"><label for="c">Setup code</label><input id="c" name="code" type="text" required autofocus class="mono" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></div>
+    <div class="field"><label for="u">Username</label><input id="u" name="username" type="text" autocomplete="username" required></div>
+    <div class="field"><label for="d">Name <span class="muted">(optional)</span></label><input id="d" name="display" type="text"></div>
+    <div class="field"><label for="e">Email <span class="muted">(optional)</span></label><input id="e" name="email" type="email"></div>
+    <div class="field"><label for="p">Password</label><input id="p" name="password" type="password" autocomplete="new-password" required minlength="12"><div class="hint">At least 12 characters. A few unrelated words work well</div></div>
+    <div class="field"><label for="p2">Password again</label><input id="p2" name="password2" type="password" autocomplete="new-password" required></div>
+    <button class="btn primary" style="width:100%">Create admin and sign in</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "reports/_base.html" %}
+{% set opt = {"plate": False, "lower": True, "plain": False, "list": False} %}
+{% import "reports/_pages.html" as P with context %}
+{% block margin %}56px 56px 88px{% endblock %}
+{% block footfont %}"JetBrains Mono", monospace{% endblock %}
+{% block footcolor %}#737373{% endblock %}
+{% block pagesep %}"/"{% endblock %}
+{% block style %}
+body { font-family: "JetBrains Mono", monospace; color: #171717; font-size: 12px; line-height: 16px; }
+.mono { font-family: "JetBrains Mono", monospace; }
+.small { font-size: 11px; }
+.muted { color: #525252; }
+.id { color: #737373; margin-right: 8px; }
+table.t, table.L { font-size: 12px; line-height: 16px; }
+.t th, .L th { text-align: left; font-weight: 500; color: #525252; padding: 0 8px 4px 0; border-bottom: 1px solid #171717; }
+.t td, .L td { padding: 4px 8px 4px 0; border-bottom: 1px solid rgba(23,23,23,.10); }
+.L td { white-space: nowrap; }
+.L td:first-child, .L th:first-child { white-space: normal; overflow-wrap: anywhere; }
+.t th.r, .L th.r { text-align: right; }
+.sec { margin: 28px 0 8px; font-size: 13px; font-weight: 500; }
+.sec span { color: #737373; font-weight: 400; }
+.page > .sec:first-child { margin-top: 0; }
+.track { display: inline-block; vertical-align: -1px; position: relative; width: 100px; height: 8px; background: #e8e8e8; margin-right: 8px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: #171717; }
+.fill.bad { background: {{ bad }}; } .fill.warn { background: {{ warn }}; } .fill.lead { background: {{ accent }}; }
+.lede { color: #525252; margin-bottom: 4px; }
+.sub { color: #737373; margin-bottom: 4px; }
+.note { margin-top: 6px; color: #525252; }
+.page section { margin-top: 0; }
+.figcap { display: flex; justify-content: space-between; color: #525252; margin: 8px 0; }
+.two { display: flex; gap: 24px; } .two .col { flex: 1; min-width: 0; }
+.name { overflow-wrap: anywhere; } .when { width: 112px; }
+.bgrid { table-layout: fixed; font-size: 12px; }
+.bgrid col.gcol { width: 200px; } .bgrid col.lcol { width: 120px; } .bgrid col.scol { width: 64px; }
+.bgrid th { font-weight: 500; color: #525252; text-align: left; padding: 0 0 4px; border-bottom: 1px solid #171717; }
+.bgrid th.c { text-align: center; } .bgrid th.r { text-align: right; }
+.bgrid td { padding: 3px 0; border-bottom: 1px solid rgba(23,23,23,.10); white-space: nowrap; overflow: hidden; }
+.bgrid .led { width: 10px; height: 8px; border-radius: 0; }
+.bgrid .latest { padding-left: 12px; }
+.legend { margin-top: 8px; color: #525252; } .legend > span { margin-right: 20px; } .legend .led { margin-right: 6px; border-radius: 0; }
+.why td { padding: 4px 0; } .whycol { width: 220px; }
+.health td { padding: 4px 0; border-bottom: 1px solid rgba(23,23,23,.10); }
+.health .hc { width: 18px; } .health .hs { color: #525252; } .health .gap { width: 24px; border-bottom: 0; }
+.health .led { border-radius: 0; width: 8px; }
+.datanote { margin-top: 16px; color: #525252; }
+.lvl { width: 40px; } .fail { color: {{ bad }}; } .warn { color: {{ warn }}; } .ok { color: {{ ok }}; }
+
+.top { display: flex; justify-content: space-between; border-bottom: 2px solid #171717; padding-bottom: 8px; }
+.top .t1 { font-size: 16px; line-height: 20px; font-weight: 500; }
+.top .t2 { color: #525252; }
+.counts { display: flex; padding: 8px 0; border-bottom: 1px solid rgba(23,23,23,.10); }
+.counts > span { margin-right: 24px; } .counts .gen { margin-left: auto; margin-right: 0; color: #525252; }
+{% endblock %}
+
+{% block body %}
+<section class="summary">
+  <div class="top"><span class="t1">cluster-report {{ week_word|lower }}</span><span class="t2">{{ start.strftime('%Y-%m-%d') }} → {{ last.strftime('%Y-%m-%d') }} · {{ (name or "cluster")|lower|replace(" ", "-") }} · {{ v.nodes|length }} nodes · {{ d.guests.total }} guests</span></div>
+  <div class="counts"><span><span class="ok">ok</span> {{ v.counts.ok }}</span><span><span class="warn">warn</span> {{ v.counts.warn }}</span><span><span class="fail">fail</span> {{ v.counts.fail }}</span><span class="gen">generated {{ generated.strftime('%Y-%m-%d %H:%M') }} · data coverage {{ "%.0f"|format(100 * d.coverage) }}%</span></div>
+
+  <section class="{{ 'flow' if v.findings|length > 12 else 'keep' }}">
+    <div class="sec">01 <span>findings</span></div>
+    {% if v.findings %}
+    <table class="L"><tbody>
+      {% for f in v.findings[:24] %}<tr><td class="when muted">{{ f.when }}</td><td class="lvl {{ f.level }}">{{ f.level }}</td><td style="white-space:normal">{{ f.text }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% if v.findings|length > 24 %}<p class="note">+{{ v.findings|length - 24 }} more</p>{% endif %}
+    {% else %}<p class="muted">no findings</p>{% endif %}
+  </section>
+
+  <section class="{{ 'flow' if v.nodes|length > 12 else 'keep' }}">
+    <div class="sec">02 <span>nodes</span></div>
+    <table class="L">
+      <thead><tr><th>node</th><th class="r">up</th><th class="r">cpu avg</th><th class="r">p95</th><th class="r">max</th><th class="r">mem avg</th><th class="r">max</th><th class="r">vcpu</th><th class="r">ram given</th><th>pve</th></tr></thead>
+      <tbody>{% for n in v.nodes %}<tr><td>{{ n.name }}</td><td class="r">{{ n.up_text }}</td><td class="r">{{ n.cpu_avg|pct }}</td><td class="r">{{ n.cpu_p95|pct }}</td><td class="r">{{ n.cpu_max|pct }}</td><td class="r">{{ n.mem_avg|pct }}</td><td class="r {{ 'warn' if n.mem_hot }}">{{ n.mem_max|pct }}</td><td class="r">{{ n.vcpu }}/{{ n.cores or '–' }}</td><td class="r">{{ (n.ram_given / 1073741824)|round|int }}/{{ ((n.ram_total or 0) / 1073741824)|round|int }}G</td><td>{{ n.pve or '–' }}{% if n.reboot %} <span class="warn">reboot</span>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+
+  <section class="{{ 'flow' if v.storage|length > 12 else 'keep' }}">
+    <div class="sec">03 <span>storage</span></div>
+    <table class="L">
+      <thead><tr><th>storage</th><th>type</th><th>used</th><th class="r">pct</th><th class="r">Δ/wk</th><th class="r">size</th><th class="r">eta {{ v.warn_pct }}%</th><th class="r">eta full</th></tr></thead>
+      <tbody>{% for s in v.storage %}<tr><td>{{ s.name }}{% if s.node %}/{{ s.node }}{% endif %}</td><td class="muted">{{ s.type }}</td><td><span class="track"><span class="fill {{ s.tone }}" style="width:{{ s.pct or 0 }}%"></span></span></td><td class="r {{ s.tone }}">{{ s.pct1 }}</td><td class="r">{{ s.per_week_text }}</td><td class="r">{{ s.size_short|replace(" ", "") }}</td><td class="r">{{ s.eta_warn_text }}</td><td class="r {{ s.tone }}">{{ s.eta_full_text }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+
+  <section class="{{ 'flow' if v.nights|length > 12 else 'keep' }}">
+    <div class="sec">04 <span>backups, {{ "last " ~ v.nights|length ~ " nights" if v.nights|length <= 31 else "per week" }}</span></div>
+    <table class="L">
+      <thead><tr><th>{{ "night" if v.nights|length <= 31 else "week" }}</th><th class="r">jobs</th><th class="r">ok</th><th class="r">failed</th><th class="r">size</th><th class="r">duration</th></tr></thead>
+      <tbody>{% for n in v.nights %}<tr><td>{{ v.night_labels[loop.index0] }}</td><td class="r">{{ n.jobs }}</td><td class="r">{{ n.ok }}</td><td class="r {{ 'fail' if n.failed else 'muted' }}">{{ n.failed }}</td><td class="r">{{ n.size_text|replace(" ", "") }}</td><td class="r">{{ n.dur_text }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  {{ P.notes() }}
+</section>
+{{ P.rest() }}
+{% endblock %}

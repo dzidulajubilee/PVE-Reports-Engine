@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ report_title }}</title>
+<style>
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url("{{ fonts }}/IBMPlexSans-400.ttf"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; src: url("{{ fonts }}/IBMPlexSans-500.ttf"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url("{{ fonts }}/IBMPlexSans-600.ttf"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url("{{ fonts }}/IBMPlexMono-400.ttf"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url("{{ fonts }}/IBMPlexMono-500.ttf"); }
+@font-face { font-family: "IBM Plex Sans Condensed"; font-weight: 400; src: url("{{ fonts }}/IBMPlexSansCondensed-400.ttf"); }
+@font-face { font-family: "Inter"; font-weight: 400; src: url("{{ fonts }}/Inter-400.ttf"); }
+@font-face { font-family: "Inter"; font-weight: 500; src: url("{{ fonts }}/Inter-500.ttf"); }
+@font-face { font-family: "Newsreader"; font-weight: 400; src: url("{{ fonts }}/Newsreader-400.ttf"); }
+@font-face { font-family: "Newsreader"; font-weight: 500; src: url("{{ fonts }}/Newsreader-500.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("{{ fonts }}/JetBrainsMono-400.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url("{{ fonts }}/JetBrainsMono-500.ttf"); }
+@font-face { font-family: "Geist"; font-weight: 400; src: url("{{ fonts }}/Geist-400.ttf"); }
+@font-face { font-family: "Geist"; font-weight: 500; src: url("{{ fonts }}/Geist-500.ttf"); }
+@font-face { font-family: "Geist Mono"; font-weight: 400; src: url("{{ fonts }}/GeistMono-400.ttf"); }
+@font-face { font-family: "Geist Mono"; font-weight: 500; src: url("{{ fonts }}/GeistMono-500.ttf"); }
+
+@page {
+  size: A4;
+  margin: {% block margin %}64px 72px 96px{% endblock %};
+  @bottom-left { content: {{ footer_left|css }}; vertical-align: bottom; padding-bottom: 40px;
+                 font: 12px/16px {% block footfont %}"IBM Plex Mono", monospace{% endblock %}; color: {% block footcolor %}#6b6b6b{% endblock %}; }
+  @bottom-right { content: counter(page) {% block pagesep %}" of "{% endblock %} counter(pages); vertical-align: bottom; padding-bottom: 40px;
+                  font: 12px/16px {{ self.footfont() }}; color: {{ self.footcolor() }}; }
+}
+html, body { margin: 0; background: #fff; }
+body { font-variant-numeric: tabular-nums; }
+p, h1, h2, h3, ul, ol, figure { margin: 0; }
+table { width: 100%; border-collapse: collapse; }
+/* page flow: a block stays together or starts a fresh page; long ones flow; headings never end a page */
+section { break-inside: avoid; }
+section.flow, section.summary { break-inside: auto; }
+.keep { break-inside: avoid; }
+.head, h1, h2, h3, .sub, .sec, .lede { break-after: avoid; }
+tbody tr:first-child, tbody tr:nth-child(2) { break-before: avoid; }
+thead { display: table-header-group; }
+tr, li { break-inside: avoid; }
+.page { break-before: page; }
+.r { text-align: right; }
+.c { text-align: center; }
+.nowrap { white-space: nowrap; }
+.clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.led { display: inline-block; width: 12px; height: 8px; border-radius: 2px; vertical-align: 0; }
+.led.ok { background: {{ ok }}; } .led.warn { background: {{ warn }}; } .led.bad, .led.fail { background: {{ bad }}; }
+.led.none { background: transparent; border: 1px dashed #737373; width: 10px; height: 6px; }
+.led.blank { background: transparent; }
+.t-ok { color: {{ ok }}; } .t-warn { color: {{ warn }}; } .t-bad, .t-fail { color: {{ bad }}; }
+a { color: {{ accent_ink }}; text-decoration: none; }
+.logo { max-height: 36px; max-width: 160px; }
+{% block style %}{% endblock %}
+</style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

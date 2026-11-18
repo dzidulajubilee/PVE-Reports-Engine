@@ -1,0 +1,115 @@
+{% extends "reports/_base.html" %}
+{% set opt = {"plate": False, "lower": False, "plain": False, "list": False} %}
+{% import "reports/_pages.html" as P with context %}
+{% block margin %}64px 64px 96px{% endblock %}
+{% block footfont %}"Geist Mono", monospace{% endblock %}
+{% block footcolor %}#6b7487{% endblock %}
+{% block style %}
+body { font-family: "Geist", sans-serif; color: #111827; font-size: 13px; line-height: 20px; }
+.mono { font-family: "Geist Mono", monospace; }
+.small { font-size: 12px; }
+.muted { color: #4b5565; }
+.id { font-family: "Geist Mono", monospace; font-size: 12px; color: #6b7487; margin-right: 8px; }
+table.t { font-size: 13px; }
+.t th { text-align: left; font-weight: 500; color: #4b5565; font-size: 12px; padding: 4px 8px 8px; border-bottom: 1px solid rgba(17,24,39,.28); }
+.t td { padding: 8px; border-bottom: 1px solid rgba(17,24,39,.10); }
+.t th:first-child, .t td:first-child { padding-left: 0; } .t th:last-child, .t td:last-child { padding-right: 0; }
+.t th.r { text-align: right; }
+/* bars in pages 2-4 read like a heat strip: the accent's strength follows the value */
+.track { display: inline-block; vertical-align: middle; position: relative; width: 72px; height: 8px; background: #eef0f4; margin-right: 8px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: {{ accent }}; opacity: .55; }
+.fill.lead { opacity: 1; } .fill.bad { background: {{ bad }}; opacity: 1; } .fill.warn { background: {{ warn }}; opacity: 1; }
+.ptitle { font-size: 22px; line-height: 28px; font-weight: 500; }
+.h2-mid { margin: 40px 0 12px; }
+.lede { margin: 12px 0 0; font-size: 15px; line-height: 24px; color: #4b5565; max-width: 600px; }
+.h3 { margin: 0 0 4px; font-size: 14px; line-height: 20px; font-weight: 500; }
+.sub { margin: 0 0 8px; font-size: 12px; line-height: 16px; color: #4b5565; }
+.note { margin: 8px 0 0; font-size: 12px; line-height: 16px; color: #4b5565; max-width: 600px; }
+.page section { margin-top: 32px; }
+.figcap { display: flex; justify-content: space-between; font-size: 12px; color: #4b5565; margin-bottom: 8px; }
+.two { display: flex; gap: 32px; } .two .col { flex: 1; min-width: 0; }
+.name { overflow-wrap: anywhere; } .when { width: 112px; }
+.bgrid { font-size: 13px; table-layout: fixed; }
+.bgrid col.gcol { width: 176px; } .bgrid col.lcol { width: 140px; } .bgrid col.scol { width: 64px; }
+.bgrid th { height: 28px; font-size: 12px; color: #4b5565; font-weight: 400; text-align: left; padding: 0; border-bottom: 1px solid rgba(17,24,39,.28); }
+.bgrid th.c { text-align: center; } .bgrid th.r { text-align: right; }
+.bgrid td { height: 30px; padding: 0; border-bottom: 1px solid rgba(17,24,39,.10); overflow: hidden; }
+.bgrid td.name { white-space: nowrap; } .bgrid .latest { padding-left: 16px; }
+.bgrid .led { width: 100%; height: 14px; border-radius: 0; margin: 0 1px; }
+.bgrid .led.blank { background: #eef0f4; } .bgrid .led.none { border: 0; background: #eef0f4; }
+.legend { margin-top: 12px; font-size: 12px; color: #4b5565; } .legend > span { margin-right: 24px; } .legend .led { margin-right: 6px; }
+.why td { padding: 8px 0; } .whycol { width: 200px; }
+.health { border-top: 1px solid rgba(17,24,39,.10); }
+.health td { height: 36px; border-bottom: 1px solid rgba(17,24,39,.10); padding: 0; }
+.health .hc { width: 24px; } .health .hs { font-size: 12px; color: #4b5565; } .health .gap { width: 32px; border-bottom: 0; }
+.datanote { margin-top: 24px; font-size: 12px; line-height: 16px; color: #4b5565; }
+
+/* page 1 */
+.hdr { display: flex; justify-content: space-between; align-items: flex-end; }
+.kicker { font-family: "Geist Mono", monospace; font-size: 12px; line-height: 16px; color: #4b5565; margin-bottom: 8px; }
+h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
+.meta { font-family: "Geist Mono", monospace; font-size: 12px; line-height: 16px; color: #4b5565; text-align: right; }
+.say { margin-top: 16px; font-size: 15px; line-height: 24px; color: #4b5565; max-width: 600px; }
+.heat { margin-top: 32px; }
+.hrow { display: flex; align-items: center; margin-bottom: 8px; }
+.hrow .hl { width: 96px; flex: none; font-size: 12px; line-height: 16px; }
+.hrow .hl .mono { font-weight: 500; }
+.hrow .hc2 { flex: 1; }
+.hdays { display: flex; font-family: "Geist Mono", monospace; font-size: 12px; line-height: 16px; color: #4b5565; }
+.hdays span { flex: 1; overflow: hidden; white-space: nowrap; }
+.hkey { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; line-height: 16px; color: #4b5565; }
+.scale span { display: inline-block; width: 20px; height: 8px; margin-right: 1px; background: {{ accent }}; vertical-align: 0; }
+.bstrip { margin-top: 32px; display: flex; align-items: center; border-top: 1px solid rgba(17,24,39,.10); border-bottom: 1px solid rgba(17,24,39,.10); padding: 8px 0; font-size: 12px; line-height: 16px; }
+.bstrip .bl { width: 96px; flex: none; font-weight: 500; }
+.bstrip .bn { flex: 1; overflow: hidden; white-space: nowrap; }
+.bstrip .led { margin-right: 6px; }
+.lower { margin-top: 32px; display: flex; gap: 32px; }
+.lower .left { flex: 3; min-width: 0; } .lower .right { flex: 2; }
+.lower h2 { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.lower .l { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(17,24,39,.10); }
+.lower .l:first-of-type { border-top: 1px solid rgba(17,24,39,.10); }
+.lower .led { margin-right: 12px; flex: none; }
+.right > div { margin-bottom: 16px; }
+.right .fl { font-size: 12px; line-height: 16px; color: #4b5565; }
+.right .fv { margin-top: 4px; font-size: 28px; line-height: 32px; font-weight: 500; }
+.right .fv span { font-size: 14px; color: #4b5565; font-weight: 400; }
+{% endblock %}
+
+{% block body %}
+<section class="summary">
+  <div class="hdr">
+    <div><p class="kicker">{{ name or "Proxmox" }} · {{ cluster }}</p><h1>The {{ period_word }} in load</h1></div>
+    <div style="text-align:right">{% if logo %}<img class="logo" src="{{ logo }}" alt=""><br>{% endif %}<p class="meta">{{ week_word[0]|upper }}{{ week_word[1:] }}<br>{{ dates if kind != "custom" else title }}</p></div>
+  </div>
+  <p class="say">{{ v.pulse_line }}</p>
+
+  <section class="heat keep">
+    {% set nb = v.buckets|length %}
+    <div class="hrow"><span class="hl"></span><div class="hc2 hdays">{% for b in v.buckets %}<span>{{ b.label if nb <= 8 or loop.index0 % 5 == 0 else "" }}</span>{% endfor %}</div></div>
+    {% for r in v.heat.rows %}
+    <div class="hrow"><span class="hl"><span class="mono">{{ r.name[:14] }}</span><br><span class="muted">{{ r.what }}</span></span><div class="hc2">{{ heat[loop.index0]|safe }}</div></div>
+    {% endfor %}
+    <div class="hkey"><span>Each cell is {{ v.heat.cell_text }}</span><span>0%<span class="scale" style="margin:0 8px">{% for o in [0.06, 0.3, 0.55, 0.8, 1] %}<span style="opacity:{{ o }}"></span>{% endfor %}</span>100%</span></div>
+  </section>
+
+  <section class="bstrip keep">
+    <span class="bl">Backups</span>
+    {% for n in v.nights %}<span class="bn">{% if n.jobs %}<span class="led {{ 'bad' if n.failed else 'ok' }}"></span>{% if nb <= 8 %}<span class="mono">{{ n.ok }}/{{ n.jobs }}</span>{% endif %}{% else %}<span class="led none"></span>{% endif %}</span>{% endfor %}
+  </section>
+
+  <section class="lower keep">
+    <div class="left">
+      <h2 class="head">Needs attention</h2>
+      {% for a in v.attention[:5] %}<div class="l"><span class="led {{ a.level }}"></span>{{ a.short }}</div>{% else %}<p class="muted">Nothing needs attention</p>{% endfor %}
+      {% if v.attention|length > 5 %}<p class="note">{{ v.attention|length - 5 }} more in the details</p>{% endif %}
+    </div>
+    <div class="right">
+      {% for k in ("guests", "storage", "available") %}{% set f = v.fig[k] %}
+      <div><p class="fl">{{ f.label }}</p><p class="fv">{{ f.value }}<span>{% if f.of %} {{ f.of }}{% endif %}{% if f.change and k == "storage" %} {{ f.change }}{% endif %}</span></p></div>
+      {% endfor %}
+    </div>
+  </section>
+  {{ P.notes() }}
+</section>
+{{ P.rest() }}
+{% endblock %}

@@ -1,0 +1,229 @@
+{# Pages 2 to 4, shared by every template. Each template styles these classes in its own look and passes `opt`:
+   plate     node and storage names on label plates (Original)
+   lower     lower-case, numbered section titles (Ledger)
+   plain     plain words for managers: servers and systems (Briefing)
+   list      changes and failed runs as bullet lists (Original) #}
+
+{% macro ptitle(num, text, tag="h2", cls="ptitle") -%}
+{% if opt.lower %}<div class="sec {{ cls }}">{{ "%02d"|format(num) }} <span>{{ text|lower }}</span></div>
+{%- else %}<{{ tag }} class="{{ cls }} head">{% if pve_url %}<a href="{{ pve_url }}" style="color:inherit">{{ text }}</a>{% else %}{{ text }}{% endif %}</{{ tag }}>{% endif %}
+{%- endmacro %}
+
+{% macro nm(x) -%}
+{% if opt.plate %}<span class="plate">{{ x }}</span>{% else %}<span class="mono">{{ x }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro gid(g) -%}<span class="id">{{ g.vmid }}</span>{{ g.name }}{%- endmacro %}
+
+{% macro bar(pct, tone="", lead=False) -%}
+<span class="track"><span class="fill {{ 'lead' if lead }} {{ tone }}" style="width:{{ [[pct or 0, 0]|max, 100]|min }}%"></span></span>
+{%- endmacro %}
+
+{% macro capacity_page(n=2) %}
+<div class="page cap">
+  {{ ptitle(5 if opt.lower else n, "Capacity") }}
+  <p class="lede">{{ v.capacity_line }}</p>
+  {% if chart and v.main %}
+  <section class="keep chart">
+    <p class="figcap"><span>{{ nm(v.main.label) }} used, last 12 weeks{% if v.main.eta_warn %} and where it is heading{% endif %}</span><span class="mono">% used</span></p>
+    {{ chart|safe }}
+  </section>
+  {% endif %}
+  {% set many = v.storage|length > 12 %}
+  <section class="{{ 'flow' if many else 'keep' }}">
+    {{ ptitle(6, "Storage", "h3", "h3") }}
+    {% if v.storage %}
+    <table class="t">
+      <thead><tr><th>Storage</th><th>Type</th><th>Used</th><th class="r">Size</th><th class="r">Change</th><th>At this rate</th></tr></thead>
+      <tbody>
+      {% for s in v.storage %}
+        <tr>
+          <td>{{ nm(s.name) }}{% if s.node %} <span class="muted">{{ s.node }}</span>{% endif %}</td>
+          <td class="muted">{{ s.type_label }}</td>
+          <td class="nowrap">{{ bar(s.pct, s.tone) }}<span class="{{ 't-' ~ s.tone if s.tone == 'bad' }}">{{ s.pct_text }}</span></td>
+          <td class="r mono small">{{ s.size_text }}</td>
+          <td class="r">{{ s.change_text }}</td>
+          <td class="{{ 't-' ~ s.tone if s.tone else ('muted' if s.rate in ('steady', '–') else '') }}">{{ s.rate }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if v.writes_note %}<p class="note">{{ v.writes_note }}</p>{% endif %}
+    {% else %}<p class="note">No storage figures could be read</p>{% endif %}
+  </section>
+  {% set manyn = v.nodes|length > 12 %}
+  <section class="{{ 'flow' if manyn else 'keep' }}">
+    {{ ptitle(7, "Given out vs installed" if not opt.plain else "Given out vs what the servers have", "h3", "h3") }}
+    <table class="t">
+      <thead><tr><th>{{ 'Server' if opt.plain else 'Node' }}</th><th class="r">vCPU given</th><th class="r">Cores</th><th class="r">Ratio</th><th class="r">RAM given</th><th class="r">Installed</th><th class="r">Memory peak</th></tr></thead>
+      <tbody>
+      {% for n in v.nodes %}
+        <tr><td>{{ nm(n.name) }}</td><td class="r">{{ n.vcpu }}</td><td class="r">{{ n.cores or '–' }}</td><td class="r">{{ n.ratio }}</td>
+            <td class="r">{{ n.ram_given_text }}</td><td class="r">{{ n.ram_total_text }}</td>
+            <td class="r {{ 't-bad' if n.mem_hot }}">{{ n.mem_max|pct }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if v.memory_note %}<p class="note">{{ v.memory_note }}</p>{% endif %}
+  </section>
+</div>
+{% endmacro %}
+
+{% macro guests_page(n=3) %}
+<div class="page gst">
+  {% if "guests" in on %}
+  {{ ptitle(8 if opt.lower else n, "Systems (VMs and containers)" if opt.plain else "VMs and containers") }}
+  <p class="lede">{{ v.guest_line }}</p>
+  <section class="{{ 'flow' if v.top|length > 12 else 'keep' }}">
+    {{ ptitle(9, "Busiest guests", "h3", "h3") }}
+    <p class="sub">CPU as a share of what each guest was given, averaged over the {{ v.word }}</p>
+    {% if v.top %}
+    <table class="t">
+      <thead><tr><th>Guest</th><th>{{ 'Server' if opt.plain else 'Node' }}</th><th>CPU</th><th class="r">Memory</th><th class="r">Disk written</th></tr></thead>
+      <tbody>
+      {% for g in v.top %}
+        <tr><td class="name">{{ gid(g) }}</td><td>{{ nm(g.node) }}</td>
+            <td class="nowrap">{{ bar(g.cpu_avg, "", loop.first) }}{{ g.cpu_text }}</td>
+            <td class="r nowrap">{{ g.mem_text }}</td><td class="r nowrap">{{ g.disk_text }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if v.top_more %}<p class="note">{{ v.top_more }} more running guests are less busy</p>{% endif %}
+    {% else %}<p class="note">No guests ran {{ v.this }}</p>{% endif %}
+  </section>
+  <section class="two keep">
+    <div class="col">
+      {{ ptitle(10, "Given far more than they use", "h3", "h3") }}
+      <p class="sub">Peak use {{ v.this }} against what is assigned</p>
+      {% if v.oversized %}
+      <table class="t">
+        <thead><tr><th>Guest</th><th class="r">Memory</th><th class="r">vCPU</th></tr></thead>
+        <tbody>{% for g in v.oversized %}<tr><td class="name">{{ gid(g) }}</td><td class="r nowrap">{{ g.mem_text }}</td><td class="r nowrap">{{ g.cpu_text }}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% if v.oversized_note %}<p class="note">{{ v.oversized_note }}</p>{% endif %}
+      {% else %}<p class="note">Every guest uses a fair share of what it was given</p>{% endif %}
+    </div>
+    <div class="col">
+      {{ ptitle(11, "Restarts and stopped", "h3", "h3") }}
+      <p class="sub">Restarts no person or backup started</p>
+      {% if v.events %}
+      <table class="t">
+        <thead><tr><th>Guest</th><th>What happened</th></tr></thead>
+        <tbody>{% for g in v.events %}<tr><td class="name">{{ gid(g) }}</td><td class="{{ 'muted' if not g.tone }}">{% if g.tone %}<span class="led {{ g.tone }}"></span> {% endif %}{{ g.what }}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% if v.stopped_note %}<p class="note">{{ v.stopped_note }}</p>{% endif %}
+      {% elif d.guests.restarts_known %}<p class="note">No unexpected restarts and nothing stopped</p>
+      {% else %}<p class="note">Restarts show once the reporter has recorded a full {{ v.word }}</p>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+  {% if "snapshots" in on and v.snapshots %}
+  <section class="keep">
+    {{ ptitle(12, "Snapshots older than " ~ v.snap_days ~ " days", "h3", "h3") }}
+    <p class="sub">An old snapshot grows as the disk under it changes</p>
+    <table class="t">
+      <thead><tr><th>Guest</th><th>Snapshot</th><th class="r">Taken</th><th class="r">Age</th></tr></thead>
+      <tbody>{% for s in v.snapshots %}<tr><td class="name">{{ gid(s) }}</td><td class="mono small clipcell">{{ s.snap }}</td><td class="r nowrap">{{ s.taken_text }}</td><td class="r nowrap">{{ s.age_text }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  {% endif %}
+  {% if "changes" in on %}
+  <section class="{{ 'flow' if v.changes|length > 12 else 'keep' }}">
+    {{ ptitle(13, "Changes " ~ v.this, "h3", "h3") }}
+    {% if v.changes %}
+    {% if opt.list %}
+    <ul class="changes">{% for c in v.changes %}<li>{{ c.text }} on {{ c.day }}{% if c.user %} by {{ c.user }}{% endif %}</li>{% endfor %}</ul>
+    {% else %}
+    <table class="t">
+      <tbody>{% for c in v.changes %}<tr><td class="mono small muted nowrap when">{{ c.day }}</td><td>{{ c.text }}</td><td class="r mono small muted">{{ c.user }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% endif %}
+    {% else %}<p class="note">No migrations, new or removed guests {{ v.this }}</p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro backups_page(n=4) %}
+<div class="page bkp">
+  {% if "backups" in on %}
+  {{ ptitle(14 if opt.lower else n, "Backups") }}
+  <p class="lede">{{ v.backup_line }}</p>
+  {% set rows = v.backup_rows %}
+  {% set nb = v.buckets|length %}
+  <section class="{{ 'flow' if rows|length > 12 else 'keep' }}">
+    {% if rows %}
+    <table class="bgrid">
+      <colgroup><col class="gcol">{% for b in v.buckets %}<col class="dcol">{% endfor %}<col class="lcol"><col class="scol"></colgroup>
+      <thead><tr><th>Guest</th>{% for b in v.buckets %}<th class="c mono day">{{ b.short if nb <= 8 else b.label }}</th>{% endfor %}<th class="latest">Latest good backup</th><th class="r">Size</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td class="name">{{ gid(r) }}</td>{% for c in r.days %}<td class="c day"><span class="led {{ c if c else 'blank' }}"></span></td>{% endfor %}
+            <td class="latest {{ 't-warn' if r.late }}">{{ r.latest_text }}</td><td class="r mono small">{{ r.size_text }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="legend"><span><span class="led ok"></span> backed up</span><span><span class="led bad"></span> failed</span><span><span class="led none"></span> in no backup job</span></p>
+    {% else %}<p class="note">{{ "No guests to back up yet" if not d.guests.total else "No backup results could be read" }}</p>{% endif %}
+  </section>
+  {% if v.failures %}
+  <section class="{{ 'flow' if v.failures|length > 12 else 'keep' }}">
+    {{ ptitle(15, "Why they failed", "h3", "h3") }}
+    {% if opt.list %}
+    <ul class="changes">{% for f in v.failures %}<li>{{ f.name }}, {{ f.full_when }}: {{ f.reason[0]|lower }}{{ f.reason[1:] }}</li>{% endfor %}</ul>
+    {% else %}
+    <table class="t why"><tbody>{% for f in v.failures %}<tr><td class="whycol">{{ f.name }} · {{ f.when }}</td><td class="muted">{{ f.reason }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% endif %}
+  {% if "pbs" in on and v.pbs %}
+  <section class="keep">
+    {{ ptitle(16, "Backup server", "h3", "h3") }}
+    {% if v.pbs.error %}<p class="note">The Proxmox Backup Server couldn't be read</p>{% else %}
+    <table class="t">
+      <thead><tr><th>Datastore</th><th>Used</th><th class="r">Size</th><th class="r">Full by</th></tr></thead>
+      <tbody>{% for s in v.pbs.stores %}<tr><td>{{ nm(s.name) }}</td><td class="nowrap">{{ bar(s.pct) }}{{ s.pct_text }}</td><td class="r mono small">{{ s.size_text }}</td><td class="r">{{ s.full_text }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="note">{% for k, x in v.pbs.kinds.items() %}{{ k|capitalize }}: {{ x.ok }} ran{% if x.failed %}, <span class="t-bad">{{ x.failed }} failed</span>{% endif %}{{ " · " if not loop.last }}{% else %}No verify, prune or garbage-collection runs {{ v.this }}{% endfor %}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% if "health" in on and v.health %}
+  <section class="keep">
+    {{ ptitle(17, "Cluster health", "h2", "ptitle h2-mid") }}
+    <table class="health">
+      {% for pair in v.health|batch(2) %}
+      <tr>{% for h in pair %}<td class="hc"><span class="led {{ h.tone }}"></span></td><td class="hw">{{ h.what }}</td><td class="hs r">{{ h.state }}</td>{% if loop.first %}<td class="gap"></td>{% endif %}{% endfor %}{% if pair|length == 1 %}<td></td><td></td><td></td>{% endif %}</tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+  {% if "logs" in on and v.logs %}
+  <section class="{{ 'flow' if v.logs|length > 8 else 'keep' }}">
+    {{ ptitle(18, "Errors in the logs", "h3", "h3") }}
+    <p class="sub">Warnings and errors from node journals and the cluster log, the same message counted once</p>
+    <table class="t">
+      <tbody>{% for l in v.logs %}<tr><td class="mono small muted nowrap when">{{ l.when }}</td><td class="mono small nowrap">{{ l.node }} {{ l.unit }}</td><td class="{{ 't-bad' if l.level == 'error' }} small">{{ l.message[:110] }}{% if l.count > 1 %} <span class="muted">×{{ l.count }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro notes() %}
+{% if v.coverage_note or errors or denied %}
+<section class="keep datanote">
+  {% if v.coverage_note %}<p>{{ v.coverage_note }}</p>{% endif %}
+  {% if errors %}<p>{{ errors }} figure{{ 's' if errors != 1 }} couldn't be fetched from Proxmox and show as –.{% if denied %} The API token isn't allowed to read some of them; see the setup guide for the ReportReader role.{% endif %}</p>{% endif %}
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro rest() %}
+{% if style == "full" or on %}
+{% if "capacity" in on %}{{ capacity_page() }}{% endif %}
+{% if "guests" in on or "snapshots" in on or "changes" in on %}{{ guests_page() }}{% endif %}
+{% if "backups" in on or "health" in on or ("pbs" in on and v.pbs) or ("logs" in on and v.logs) %}{{ backups_page() }}{% endif %}
+{% endif %}
+{% endmacro %}
