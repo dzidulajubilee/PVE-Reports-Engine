@@ -4,7 +4,8 @@
 
 - Fix: install.sh stopped silently on a re-run when .env had no PORTAL_PORT. It now says where it stops if
   anything fails.
-- install.sh run as root no longer makes the reporter run as root; an existing root install is moved to an
+- install.sh can be run by any user. Without Docker access or write access to the folder it runs itself again
+  with sudo. The reporter runs as the person who ran it (never root); an existing root install is moved to an
   ordinary user and its data handed over.
 
 - The portal now answers on https://server (port 443) by default, and plain http://server redirects to it. Set

@@ -25,15 +25,36 @@ CERT_ONLY=0
 [ "${1:-}" = "--cert" ] && CERT_ONLY=1
 
 command -v docker > /dev/null || { warn "Docker isn't installed: https://docs.docker.com/engine/install/"; exit 1; }
-docker compose version > /dev/null 2>&1 || { warn "The Docker Compose plugin isn't installed"; exit 1; }
 command -v openssl > /dev/null || { warn "openssl isn't installed (apt install openssl)"; exit 1; }
 
+# ---------------------------------------------------------------- who runs it
+# Any user can run this. It needs Docker and write access to this folder; when the current user lacks either it
+# runs itself again with sudo. The reporter itself always runs as an ordinary user, never root.
+need_sudo=""
+if [ "$(id -u)" != 0 ]; then
+  docker info > /dev/null 2>&1 || need_sudo="to use Docker"
+  for f in . .env reporter/.env reporter/out nginx/certs; do
+    if [ -e "$f" ] && [ ! -w "$f" ]; then need_sudo="${need_sudo:-to change files owned by another user}"; fi
+  done
+  if [ -n "$need_sudo" ]; then
+    if command -v sudo > /dev/null; then
+      note "$(id -un) needs sudo $need_sudo, so the installer runs itself again with sudo."
+      note "(To skip this next time: sudo usermod -aG docker $(id -un), then log out and back in.)"
+      exec sudo "$0" "$@"
+    fi
+    warn "$(id -un) can't $need_sudo and sudo isn't available. Run this as root, or add the user to the docker group."
+    exit 1
+  fi
+fi
+docker compose version > /dev/null 2>&1 || { warn "The Docker Compose plugin isn't installed"; exit 1; }
+
 # ---------------------------------------------------------------- settings
-# the reporter runs as an ordinary user, never root: when the installer runs as root, use the owner of this
-# folder, or 1000 if root owns it too
+# The container's user: whoever ran the installer (the sudo caller when it ran itself again), else the owner of
+# this folder, else 1000. Never root.
 uid=$(id -u); gid=$(id -g)
 if [ "$uid" = 0 ]; then
-  uid=$(stat -c %u .); gid=$(stat -c %g .)
+  if [ -n "${SUDO_UID:-}" ] && [ "$SUDO_UID" != 0 ]; then uid=$SUDO_UID; gid=${SUDO_GID:-$SUDO_UID}
+  else uid=$(stat -c %u .); gid=$(stat -c %g .); fi
   if [ "$uid" = 0 ]; then uid=1000; gid=1000; fi
 fi
 if [ ! -f .env ]; then
@@ -51,8 +72,10 @@ else
 fi
 chmod 600 reporter/.env
 mkdir -p reporter/out
-# the container's user must own its data (and only it can read the secrets in there)
-if [ "$(id -u)" = 0 ]; then chown -R "$uid:$gid" reporter/out; fi
+mkdir -p nginx/certs
+# the reporter's user owns its data and settings (and only it can read the secrets in them)
+own() { if [ "$(id -u)" = 0 ]; then chown -R "$uid:$gid" "$@"; fi; }
+own reporter/out reporter/.env .env
 
 # fingerprint HOST[:PORT] -> SHA-256 fingerprint of the certificate it shows, or nothing
 fingerprint() {
@@ -109,6 +132,7 @@ if [ ! -s nginx/certs/server.crt ]; then
   openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes -keyout nginx/certs/server.key -out nginx/certs/server.crt \
     -subj "/CN=$host" -addext "subjectAltName=DNS:$host${ip:+,IP:$ip}" 2> /dev/null
   chmod 600 nginx/certs/server.key
+  own nginx/certs
   note "Made a self-signed HTTPS certificate in nginx/certs (replace it with your own any time)."
 fi
 

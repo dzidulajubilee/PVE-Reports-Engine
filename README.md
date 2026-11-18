@@ -25,7 +25,8 @@ You need a Linux host with Docker and the Compose plugin that can reach the Prox
    cd PVE-Reports-Engine
    ./install.sh
    ```
-   The installer asks for a name, time zone, node addresses and the token, reads each node's certificate
+   Run it as any user: if that user can't use Docker, it runs itself again with `sudo`. The reporter always runs
+   as that user, never as root. The installer asks for a name, time zone, node addresses and the token, reads each node's certificate
    fingerprint for you to confirm, makes an HTTPS certificate for the portal, builds and starts the containers, and
    creates the first admin account.
    At the end it offers to read back past logs (30 days by default) so your first reports already show errors
