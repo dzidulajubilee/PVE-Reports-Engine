@@ -210,7 +210,7 @@ def typical(kind="weekly"):
          "backups": {"runs_total": total, "runs_ok": total, "runs_failed": 0},
          "storage": [{**s, "pct": s["pct"] - s["change_pts"]} for s in storage],
          "guests_running": {"running": len(running) - 1, "total": len(gl)}}
-    return start, end, d, p
+    return start, end, add_extras(d, "typical"), p
 
 
 def empty(kind="weekly"):
@@ -238,6 +238,7 @@ def empty(kind="weekly"):
                     "restarted": [], "stopped": [], "stopped_disk": 0, "restarts_known": False},
          "guests_running": {"running": 0, "total": 0}, "changes": [], "snapshots": [], "health": [], "logs": [],
          "log_lines": 0, "logs_collected": False, "failed_tasks": [], "pbs": None}
+    add_extras(d, "empty")
     p = {"start": s_ - (e_ - s_), "end": s_, "coverage": 0.0, "available_pct": None,
          "backups": {"runs_total": 0, "runs_ok": 0, "runs_failed": 0}, "storage": [], "guests_running": None}
     return start, end, d, p
@@ -287,7 +288,71 @@ def huge(kind="weekly"):
     d["snapshots"] = [{"vmid": 1000 + i, "name": gl[i]["name"], "snap": f"before-upgrade-{i}-with-a-long-snapshot-name",
                        "taken": d["start"] - 100 * DAY, "age": 100 + i} for i in range(25)]
     d["logs"] = d["logs"] * 6
+    add_extras(d, "huge")
     return start, end, d, p
+
+
+def add_extras(d, size):
+    """Made-up figures for the optional sections."""
+    e_ = d["end"]
+    big = size == "huge"
+    for i, n in enumerate(d["nodes"]):
+        n.update(net_in=(2.1 + i) * 1e11, net_out=(1.4 + i) * 1e11, net_peak=1.1e8,
+                 pressure={"cpu": (1.2 + i, 9.0), "mem": (0.1, 2.0), "io": (0.4 + i, 12.0)} if size != "empty" else {})
+    for i, g in enumerate(d["guests"]["list"]):
+        g.update(net_in=(40 - i % 40) * 1e9, net_out=(20 - i % 20) * 1e9)
+    if size == "empty":
+        d.update(x_tasks=[], x_certs=[], x_guest_disks={"rows": [], "checked": 0, "no_agent": 0},
+                 x_security={"logins": [], "login_total": 0, "tickets": 0, "logs_collected": False, "drops": 0,
+                             "top_src": [], "top_ports": [], "fw_logging": False},
+                 x_backup_jobs={"jobs": [], "excluded": [], "points": {}}, x_replication=[],
+                 x_pools={"pools": [], "tags": [], "used": False}, x_storage_detail={"lvm": [], "zfs": [], "ceph": None},
+                 x_trends=None)
+        return d
+    reps = 40 if big else 3
+    names = [g["name"] for g in d["guests"]["list"]]
+    d["x_tasks"] = [{"t": d["start"] + k * 7000, "node": "hv-02", "what": "VM migration", "guest": f"{110 + k} {names[k % len(names)]}",
+                     "user": "ops@pve", "status": "migration aborted: target node hv-03 is not online"} for k in range(30 if big else 2)]
+    d["x_certs"] = [{"node": n["name"], "what": "web", "file": "pve-ssl.pem", "name": f"{n['name']}.example.lan",
+                     "until": e_ + (20 + 300 * i) * 86400, "days": 20 + 300 * i, "acme": False} for i, n in enumerate(d["nodes"])] + [
+                    {"node": "cluster", "what": "ca", "file": "pve-root-ca.pem", "name": "Proxmox Virtual Environment",
+                     "until": e_ + 3600 * 86400, "days": 3600, "acme": False}]
+    rows = [{"vmid": g["vmid"], "name": g["name"], "mount": "/var/lib/postgresql" if k == 0 else "C:\\", "type": "ext4",
+             "used": (0.93 - 0.05 * k) * 200e9, "total": 200e9} for k, g in enumerate(d["guests"]["list"][: 20 if big else 3])]
+    for r in rows:
+        r["pct"] = 100 * r["used"] / r["total"]
+    d["x_guest_disks"] = {"rows": rows, "checked": 12, "no_agent": 2}
+    d["x_security"] = {"logins": [{"user": "root@pam", "rhost": "192.0.2.44", "count": 37, "last": e_ - 3600},
+                                  {"user": "admin@pve", "rhost": "198.51.100.7", "count": 3, "last": e_ - 86400}] * (5 if big else 1),
+                       "login_total": 40, "tickets": 33, "logs_collected": True, "drops": 1240,
+                       "top_src": [("203.0.113.9", 900)], "top_ports": [("22", 1100), ("8006", 140)], "fw_logging": True}
+    d["x_backup_jobs"] = {"jobs": [{"id": "backup-a", "enabled": True, "schedule": "daily 01:00", "storage": "backup-nfs",
+                                    "keep": "7 daily, 4 weekly", "covers": "all guests", "mode": "snapshot"},
+                                   {"id": "backup-b", "enabled": False, "schedule": "sat 23:00", "storage": "backup-nfs",
+                                    "keep": "2 last", "covers": "3 guests", "mode": "snapshot"}] * (6 if big else 1),
+                          "excluded": [{"vmid": 120, "name": "files", "disk": "scsi1", "volume": "ceph-vm:vm-120-disk-1",
+                                        "reason": "backup=no"}],
+                          "points": {g["vmid"]: {"count": 14, "last": e_ - 86400, "verify": "ok" if k % 5 else None}
+                                     for k, g in enumerate(d["guests"]["list"])}}
+    d["x_replication"] = [{"id": f"{110 + k}-0", "guest": 110 + k, "name": names[k % len(names)], "source": "hv-02",
+                           "target": "hv-03", "schedule": "*/15", "last_sync": e_ - 900, "duration": 31.2,
+                           "fail_count": 1 if k == 0 else 0, "error": ""} for k in range(reps)]
+    d["x_pools"] = {"pools": [{"pool": p, "guests": 8, "running": 7, "vcpu": 36, "ram": 96 * GIB, "disk": 2.4e12, "cpu": 21.0,
+                               "backups_ok": 49, "backups_failed": 1} for p in (["IT", "Finance", "(no pool)"] * (6 if big else 1))],
+                    "tags": [("prod", 11), ("db", 2), ("web", 3)], "used": True}
+    d["x_cluster_net"] = {"links": [{"node": n["name"], "id": i + 1, "rings": [f"10.0.0.{21 + i}", f"10.1.0.{21 + i}"]}
+                                    for i, n in enumerate(d["nodes"])],
+                          "down": [{"seen_by": "hv-01", "peer": "hv-02", "link": "0", "count": 3}], "qdevice": False}
+    d["x_storage_detail"] = {"lvm": [{"node": "hv-01", "name": "pve/data", "pct": 61.0, "meta_pct": 82.0}],
+                             "zfs": [{"node": n["name"], "name": "rpool", "health": "ONLINE", "frag": min(90, 47 + 10 * i), "pct": 45.0,
+                                      "dedup": 1} for i, n in enumerate(d["nodes"])],
+                             "ceph": {"pools": [{"name": "ceph-vm", "pct": 62.0, "size": 3, "pgs": 128}]}}
+    d["x_trends"] = {"labels": ["W39", "W40", "W41", "W42", "W43", "W44", "W45", "W46"],
+                     "rows": [("CPU, average %", [12, 14, None, 15, 16, 17, 16, 18], "pct"),
+                              ("Memory, average %", [60, 61, 61, 62, 63, 63, 64, 64], "pct"),
+                              ("Backup jobs run", [21] * 8, "num"), ("Backup jobs with errors", [0, 0, 0, 1, 0, 0, 0, 3], "num"),
+                              ("Other tasks failed", [0, 1, 0, 0, 0, 2, 0, 2], "num")]}
+    return d
 
 
 SIZES = {"empty": empty, "typical": typical, "huge": huge}

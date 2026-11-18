@@ -27,6 +27,18 @@ SECTIONS = [
     ("health", "Cluster health", "Quorum, HA, Ceph, ZFS, disk wear and SMART, services, replication, kernel, clock"),
     ("pbs", "Proxmox Backup Server", "Datastore use and when it fills up, verify, prune and garbage-collection runs"),
     ("logs", "Errors in the logs", "Warnings and errors from node journals and the cluster log (needs Sys.Syslog)"),
+    ("tasks", "Failed tasks", "Migrations, starts, stops, disk moves and other tasks that failed, with who ran them"),
+    ("trends", "Trends", "This period next to the ones before: 8 weeks, 6 months or 4 quarters (not for custom dates)"),
+    ("certificates", "Certificates", "When each node's web certificate and the cluster CA expire"),
+    ("guest_disks", "Disks inside guests", "Filesystems filling up inside VMs (needs the guest agent) and containers"),
+    ("security", "Sign-ins and firewall", "Failed sign-ins by user and address, and connections the host firewall blocked"),
+    ("pressure", "Resource pressure", "How long work waited for CPU, memory or disk on each node (Proxmox VE 9)"),
+    ("backup_coverage", "Backup jobs and coverage", "Each job's schedule, storage and retention, disks left out, restore points and verification"),
+    ("replication", "Replication", "Each replication job's last sync, how long it took and failures"),
+    ("network", "Network traffic", "Data in and out per node, peak rate, and the guests that moved the most"),
+    ("pools", "Pools and tags", "Guests, allocation, load and backups per pool, and the tags in use"),
+    ("cluster_net", "Cluster network", "Corosync links per node and every link that went down (clusters only)"),
+    ("storage_detail", "Storage detail", "LVM-thin metadata, ZFS fragmentation, Ceph pools"),
 ]
 SECTION_KEYS = [k for k, *_ in SECTIONS]
 

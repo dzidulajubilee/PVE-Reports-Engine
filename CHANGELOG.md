@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Twelve new sections, each switchable in Settings: failed tasks, trends, certificates, disks inside guests,
+  sign-ins and firewall, resource pressure, backup jobs and coverage, replication, network traffic, pools and
+  tags, cluster network, storage detail. The serious findings also appear in Needs attention.
+- Settings no longer shows an old connection problem after the connection works again.
+
 - Single node or cluster: each report works out the setup and follows it. A standalone node reads as a server
   ("Server up", no quorum lines); a cluster with only local disks charts every node's storage, the fullest in
   the accent colour.

@@ -219,6 +219,13 @@ class Source:
     def get(self, path, **params):
         return self._safe(self.client, path, params)
 
+    def quiet(self, path, **params):
+        """For calls expected to fail for some guests (no guest agent): None on failure, nothing counted."""
+        try:
+            return self.client.get(path, **params) if self.client else None
+        except Exception:  # noqa: BLE001
+            return None
+
     def pbs_get(self, path, **params):
         return self._safe(self.pbs, path, params) if self.pbs else None
 

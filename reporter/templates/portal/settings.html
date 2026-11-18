@@ -81,7 +81,7 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
     <p class="flash" style="margin:0 0 12px">This cluster has {{ missing_nodes|length + s.pve.hosts|length }} nodes but {{ missing_nodes|length }} aren't listed above, so reports stop when the listed one is down. Add: <span class="mono">{{ missing_nodes|join(', ') }}</span>{% if s.pve.fingerprint and not s.pve.ca_pem %}, with each one's fingerprint (or paste the cluster CA instead, which covers them all){% endif %}</p>
     {% endif %}
     <div class="test-row"><button type="button" class="btn quiet small" data-test="pve">Test connection</button><span class="result" id="pve-result"></span></div>
-    {% if snapshot_error %}<p class="hint" style="color:var(--bad)">Last problem: {{ snapshot_error.split(' ', 1)[1] if ' ' in snapshot_error else snapshot_error }}</p>{% endif %}
+    {% if snapshot_error and (snapshot_error.split(' ', 1)[0]|int) > (last_snapshot|int if last_snapshot else 0) %}<p class="hint" style="color:var(--bad)">Last problem, {{ fmt(snapshot_error.split(' ', 1)[0]) }}: {{ snapshot_error.split(' ', 1)[1] }}</p>{% endif %}
     <div class="field" style="margin:16px 0 0"><label for="pve_url">Proxmox web address for links in the PDFs</label>
       <input type="text" id="pve_url" name="pve_url" value="{{ s.general.pve_url }}" placeholder="https://pve1.example.lan:8006">
       <label class="check" style="margin-top:8px"><input type="checkbox" name="pve_links" {{ 'checked' if s.general.pve_links }}> Link section headings to the Proxmox web UI</label></div>

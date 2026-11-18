@@ -15,7 +15,7 @@ def v_typical(**gen):
 
 def test_headline_names_the_most_serious_problems():
     v, _ = v_typical()
-    assert v["headline"].startswith("A steady week with 2 things to fix: storage on hv-03 is nearly full")
+    assert v["headline"].startswith("A steady week with 3 things to fix: storage on hv-03 is nearly full")
     assert "3 nightly backups failed" in v["headline"]
 
 
@@ -32,7 +32,7 @@ def test_attention_is_most_serious_first_and_specific():
 
 def test_storage_threshold_is_a_setting():
     v, _ = v_typical(storage_warn=95)
-    assert not any("backup-nfs" in a["text"] for a in v["attention"])
+    assert not any(a["area"] == "capacity" and "backup-nfs" in a["text"] for a in v["attention"])
 
 
 def test_comparisons_only_when_fair():

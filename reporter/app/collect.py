@@ -357,7 +357,7 @@ def logs_between(start, end, limit=20):
 # ---------------------------------------------------------------- the collection
 
 
-def collect(S, start, end, settings, full=True, now=None):
+def collect(S, start, end, settings, full=True, now=None, kind=None, on=None):
     """All figures for [start, end). full=False collects only what comparisons need (the period before)."""
     now = now or time.time()
     tz = config.TZ
@@ -461,6 +461,9 @@ def collect(S, start, end, settings, full=True, now=None):
             "heat": heat_cells(avg, start, end),
             "disks": [],
         }
+        from .extras import node_rrd_extras
+
+        nd.update(node_rrd_extras(avg, mx))
         nd["reboot"] = nd["kernel_new"] is not None
         if nd["uptime"] and not nd["reboots"] and s_ <= now - nd["uptime"] < e_:
             nd["reboots"] = [int(now - nd["uptime"])]
@@ -492,6 +495,13 @@ def collect(S, start, end, settings, full=True, now=None):
 
     # ---- Proxmox Backup Server
     d["pbs"] = collect_pbs(S, s_, e_) if S.pbs else None
+
+    # ---- optional sections, each only when ticked
+    from .extras import collect_extras
+
+    ctx = {"online": online, "guests_res": guests_res, "tasks": tasks, "s_": s_, "e_": e_, "now": now,
+           "storage_cfg": storage_cfg, "kind": kind, "start": start}
+    collect_extras(S, d, ctx, set(config.SECTION_KEYS) if on is None else on)
     return d
 
 
@@ -707,11 +717,14 @@ def collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks):
         mem = vals(avg, "mem")
         memx = vals(mx, "mem")
         cpux = vals(mx, "cpu")
-        written = 0
+        written = net_in = net_out = 0
         pts = avg or []
         for a, b in zip(pts, pts[1:], strict=False):
+            step = b["time"] - a["time"]
             if isinstance(a.get("diskwrite"), (int, float)):
-                written += a["diskwrite"] * (b["time"] - a["time"])
+                written += a["diskwrite"] * step
+            net_in += (a.get("netin") or 0) * step
+            net_out += (a.get("netout") or 0) * step
         info = sg.get(v)
         planned = [t["starttime"] for t in tasks if t.get("id") == str(v) and t.get("type") in PLANNED]
         restarts = []
@@ -729,6 +742,7 @@ def collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks):
             "cpu_peak_vcpu": (max(cpux) * (g.get("maxcpu") or 0)) if cpux else None,
             "mem_avg": mean(mem), "mem_max": max(memx) if memx else (max(mem) if mem else None),
             "disk_written": written if pts else None,
+            "net_in": net_in if pts else None, "net_out": net_out if pts else None,
             "restarts": restarts,
             "ran_all": bool(info) and info["running_share"] >= 0.999 and not restarts,
             "stopped_since": stopped_since,
@@ -1019,6 +1033,17 @@ def pbs_groups(S):
         spaces = [n.get("ns", "") for n in S.pbs_get(f"/admin/datastore/{store}/namespace") or []] or [""]
         for ns in spaces:
             out += S.pbs_get(f"/admin/datastore/{store}/groups", ns=ns or None) or []
+    return out
+
+
+def pbs_snapshots(S):
+    """Every snapshot on the backup server, in every datastore and namespace."""
+    out = []
+    for ds in S.pbs_get("/admin/datastore") or []:
+        store = ds.get("store")
+        spaces = [n.get("ns", "") for n in S.pbs_get(f"/admin/datastore/{store}/namespace") or []] or [""]
+        for ns in spaces:
+            out += S.pbs_get(f"/admin/datastore/{store}/snapshots", ns=ns or None) or []
     return out
 
 

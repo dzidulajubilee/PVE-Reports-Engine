@@ -106,6 +106,26 @@ class FakeApi:
             return {"time": int(time.time())}
         if path.endswith("/subscription"):
             return {"status": "notfound"}
+        if path.endswith("/certificates/info"):
+            return [{"filename": "pve-ssl.pem", "notafter": NOW + 20 * DAY, "subject": "/CN=pve-a.example.lan",
+                     "issuer": "/CN=Proxmox Virtual Environment"},
+                    {"filename": "pve-root-ca.pem", "notafter": NOW + 3000 * DAY, "subject": "/CN=Proxmox Virtual Environment"}]
+        if path == "/cluster/config/nodes":
+            return [{"name": "pve-a", "nodeid": "1", "ring0_addr": "192.0.2.1"}, {"name": "pve-b", "nodeid": "2", "ring0_addr": "192.0.2.2"}]
+        if path.endswith("/included_volumes"):
+            return {"children": [{"id": 100, "name": "vm-0", "children": [
+                {"id": "100:scsi0", "included": 1, "reason": "backup=yes"}, {"id": "100:scsi1", "included": 0, "reason": "backup=no"}]}]}
+        if path.endswith("/config") and "/qemu/" in path:
+            return {"agent": "1"}
+        if path.endswith("/agent/get-fsinfo"):
+            return {"result": [{"mountpoint": "/", "type": "ext4", "total-bytes": 100 * GIB, "used-bytes": 95 * GIB},
+                               {"mountpoint": "/snap/core", "type": "squashfs", "total-bytes": 2 * GIB, "used-bytes": 2 * GIB}]}
+        if path.endswith("/firewall/log"):
+            return [{"n": 1, "t": "0 5 - 18/Nov/2026:00:39:18 +0000 policy DROP: IN=vmbr0 SRC=203.0.113.9 DST=192.0.2.1 PROTO=TCP DPT=22"}]
+        if path.endswith("/disks/lvmthin"):
+            return []
+        if path == "/cluster/config/qdevice":
+            return {}
         raise pve.ApiError("403 Permission check failed", status=403, path=path)
 
 
@@ -132,6 +152,10 @@ def test_collect_from_api(period):
     assert any("moved" in c["text"] for c in d["changes"])
     assert any(h["key"] == "disks" and h["tone"] == "warn" for h in d["health"])
     assert S.errors == []
+    assert d["x_certs"][0]["days"] in (19, 20) and d["x_backup_jobs"]["excluded"][0]["disk"] == "scsi1"
+    assert d["x_guest_disks"]["rows"][0]["pct"] == 95 and len(d["x_guest_disks"]["rows"]) == 4  # squashfs left out
+    assert d["x_security"]["drops"] == 2 and d["x_security"]["top_ports"][0] == ("22", 2)
+    assert d["x_cluster_net"]["links"][0]["rings"] == ["192.0.2.1"]
 
 
 def test_build_end_to_end(monkeypatch, period):

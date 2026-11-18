@@ -204,6 +204,7 @@ def loop():
                 n = take(pve_client(s))
                 log.debug("snapshot: %d rows", n)
                 db.set_state("last_snapshot", int(started))
+                db.set_state("last_snapshot_error", "")  # it works again: an old problem isn't the last one
             if started - last_prune > 86400:
                 db.prune(started)
                 last_prune = started

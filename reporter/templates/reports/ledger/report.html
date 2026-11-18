@@ -61,9 +61,9 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
     <div class="sec">01 <span>findings</span></div>
     {% if v.findings %}
     <table class="L"><tbody>
-      {% for f in v.findings[:24] %}<tr><td class="when muted">{{ f.when }}</td><td class="lvl {{ f.level }}">{{ f.level }}</td><td style="white-space:normal">{{ f.text }}</td></tr>{% endfor %}
+      {% for f in v.findings[:8] %}<tr><td class="when muted">{{ f.when }}</td><td class="lvl {{ f.level }}">{{ f.level }}</td><td title="{{ f.text }}">{{ f.text|truncate(74, True, "…", 0) }}</td></tr>{% endfor %}
     </tbody></table>
-    {% if v.findings|length > 24 %}<p class="note">+{{ v.findings|length - 24 }} more</p>{% endif %}
+    {% if v.findings|length > 8 %}<p class="note">+{{ v.findings|length - 8 }} more{% if style == "full" %} in the sections below{% endif %}</p>{% endif %}
     {% else %}<p class="muted">no findings</p>{% endif %}
   </section>
 

@@ -120,7 +120,7 @@ def build(kind, end=None, start=None):
     except ApiError as e:
         raise RuntimeError(f"the Proxmox connection isn't set up yet ({e}). An admin can add it in Settings") from e
     S = Source(client, pbs_client(st) if ("pbs" in show["full"] | show["summary"]) else None)
-    d = collect(S, start, end, st, full=True)
+    d = collect(S, start, end, st, full=True, kind=kind, on=show["full"] | show["summary"])
     if not d["api_ok"]:
         reason = S.errors[0][1] if S.errors else "no data came back"
         raise RuntimeError(f"Proxmox couldn't be read: {reason}")

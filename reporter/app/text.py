@@ -285,6 +285,16 @@ def view(d, p, kind, settings, on=None):
     att = attention(d, v, word, this, warn_pct, n_nodes)
     v["attention"] = att
     v["att_top"], v["att_more"] = att[:4], att[4:]
+    from .extras import view_extras
+
+    v["x"], extra_att = view_extras(d, v, warn_pct, when, fbytes, fmem, fpct, fduration, join, plural)
+    for level, area, text, short in extra_att:
+        v["attention"].append({"level": level, "area": area, "text": text, "short": short, "aside": "", "t": d["end"] - 1,
+                               "ledger": text, "plain": text, "head": short})
+    v["attention"].sort(key=lambda a: a["level"] != "bad")
+    v["bad"] = [a for a in v["attention"] if a["level"] == "bad"]
+    v["warn"] = [a for a in v["attention"] if a["level"] == "warn"]
+    v["att_top"], v["att_more"] = v["attention"][:4], v["attention"][4:]
     v["bad"] = [a for a in att if a["level"] == "bad"]
     v["warn"] = [a for a in att if a["level"] == "warn"]
 

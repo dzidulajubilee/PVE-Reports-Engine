@@ -21,6 +21,7 @@
 
 {% macro capacity_page(n=2) %}
 <div class="page cap">
+  {% if "capacity" in on %}
   {{ ptitle(5 if opt.lower else n, "Capacity") }}
   <p class="lede">{{ v.capacity_line }}</p>
   {% if chart and v.main %}
@@ -66,6 +67,47 @@
     </table>
     {% if v.memory_note %}<p class="note">{{ v.memory_note }}</p>{% endif %}
   </section>
+  {% else %}
+  {{ ptitle(5 if opt.lower else 2, "Capacity and performance") }}
+  {% endif %}
+  {% set X = v.x %}
+  {% if "storage_detail" in on and X.storage_detail %}{% set sd = X.storage_detail %}
+  <section class="keep">
+    {{ ptitle(19, "Storage detail", "h3", "h3") }}
+    <table class="t">
+      <thead><tr><th>Pool</th><th>Node</th><th>Kind</th><th class="r">Used</th><th class="r">Detail</th></tr></thead>
+      <tbody>
+      {% for z in sd.zfs %}<tr><td>{{ nm(z.name) }}</td><td>{{ z.node }}</td><td class="muted">ZFS</td><td class="r">{{ z.pct|pct }}</td><td class="r {{ 't-warn' if (z.frag or 0) >= 70 }}">{{ z.frag }}% fragmented{% if z.health != "ONLINE" %} · <span class="t-bad">{{ z.health|lower }}</span>{% endif %}</td></tr>{% endfor %}
+      {% for t in sd.lvm %}<tr><td>{{ nm(t.name) }}</td><td>{{ t.node }}</td><td class="muted">LVM-thin</td><td class="r">{{ t.pct|pct }}</td><td class="r {{ 't-bad' if (t.meta_pct or 0) >= 80 }}">metadata {{ t.meta_pct|pct }}</td></tr>{% endfor %}
+      {% if sd.ceph %}{% for c in sd.ceph.pools %}<tr><td>{{ nm(c.name) }}</td><td>cluster</td><td class="muted">Ceph pool</td><td class="r">{{ c.pct|pct }}</td><td class="r">{{ c.size }}× replicas · {{ c.pgs }} PGs</td></tr>{% endfor %}{% endif %}
+      </tbody>
+    </table>
+    <p class="note">ZFS slows down when heavily fragmented; LVM-thin stops writing when its metadata fills, even with data space left</p>
+  </section>
+  {% endif %}
+  {% if "network" in on and X.network %}{% set many = X.network|length > 6 %}
+  <section class="{{ 'flow' if many else 'keep' }}">
+    {{ ptitle(20, "Network traffic", "h3", "h3") }}
+    <div class="{{ '' if many else 'two' }}">
+      <div class="col">
+        <table class="t"><thead><tr><th>Node</th><th class="r">In</th><th class="r">Out</th><th class="r">Peak</th></tr></thead>
+        <tbody>{% for n in X.network %}<tr><td>{{ nm(n.name) }}</td><td class="r nowrap">{{ n['in'] }}</td><td class="r nowrap">{{ n.out }}</td><td class="r nowrap">{{ n.peak }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+      <div class="col"{% if many %} style="margin-top:16px"{% endif %}>
+        {% if X.network_guests %}<table class="t"><thead><tr><th>Busiest guests</th><th class="r">In</th><th class="r">Out</th></tr></thead>
+        <tbody>{% for g in X.network_guests %}<tr><td class="name">{{ gid(g) }}</td><td class="r nowrap">{{ g['in'] }}</td><td class="r nowrap">{{ g.out }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+  {% if "pressure" in on and X.pressure %}
+  <section class="keep">
+    {{ ptitle(21, "Resource pressure", "h3", "h3") }}
+    <p class="sub">Share of time work waited for each resource, average · worst moment. Above a few percent, guests felt it</p>
+    <table class="t"><thead><tr><th>Node</th><th class="r">CPU</th><th class="r">Memory</th><th class="r">Disk I/O</th></tr></thead>
+    <tbody>{% for n in X.pressure %}<tr><td>{{ nm(n.name) }}</td><td class="r">{{ n.cpu }}</td><td class="r">{{ n.mem }}</td><td class="r">{{ n.io }}</td></tr>{% endfor %}</tbody></table>
+  </section>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -141,6 +183,25 @@
     {% else %}<p class="note">No migrations, new or removed guests {{ v.this }}</p>{% endif %}
   </section>
   {% endif %}
+  {% set X = v.x %}
+  {% if "guest_disks" in on and X.guest_disks is defined %}
+  <section class="keep">
+    {{ ptitle(22, "Disks inside guests", "h3", "h3") }}
+    <p class="sub">{% if X.guest_disks_full %}Filesystems at {{ v.warn_pct }}% or more{% else %}The fullest filesystems; none is at {{ v.warn_pct }}%{% endif %}. {{ X.guest_disks_note }}</p>
+    {% if X.guest_disks %}
+    <table class="t"><thead><tr><th>Guest</th><th>Filesystem</th><th>Used</th><th class="r">Size</th></tr></thead>
+    <tbody>{% for r in X.guest_disks %}<tr><td class="name">{{ gid(r) }}</td><td class="mono small clipcell">{{ r.mount }}</td><td class="nowrap">{{ bar(r.pct, r.tone) }}<span class="{{ 't-' ~ r.tone if r.tone }}">{{ r.pct_text }}</span></td><td class="r mono small nowrap">{{ r.size_text }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% if "pools" in on and X.pools %}
+  <section class="{{ 'flow' if X.pools|length > 12 else 'keep' }}">
+    {{ ptitle(23, "Pools and tags", "h3", "h3") }}
+    <table class="t"><thead><tr><th>Pool</th><th class="r">Guests</th><th class="r">vCPU</th><th class="r">RAM</th><th class="r">Disk</th><th class="r">CPU</th><th class="r">Backups</th></tr></thead>
+    <tbody>{% for p in X.pools %}<tr><td>{{ p.pool }}</td><td class="r">{{ p.running }} of {{ p.guests }}</td><td class="r">{{ p.vcpu }}</td><td class="r nowrap">{{ p.ram_text }}</td><td class="r nowrap">{{ p.disk_text }}</td><td class="r">{{ p.cpu_text }}</td><td class="r nowrap">{{ p.backups_ok }}{% if p.backups_failed %} · <span class="t-bad">{{ p.backups_failed }} failed</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+    {% if X.tags %}<p class="note">Tags: {% for t, n in X.tags %}{{ t }} ({{ n }}){{ ", " if not loop.last }}{% endfor %}</p>{% endif %}
+  </section>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -177,6 +238,19 @@
   </section>
   {% endif %}
   {% endif %}
+  {% set X = v.x %}
+  {% if "backup_coverage" in on and X.backup_jobs is defined %}
+  <section class="keep">
+    {{ ptitle(24, "Backup jobs", "h3", "h3") }}
+    {% if X.backup_jobs %}
+    <table class="t"><thead><tr><th>Schedule</th><th>Covers</th><th>Storage</th><th>Keeps</th><th class="r">State</th></tr></thead>
+    <tbody>{% for j in X.backup_jobs %}<tr><td class="nowrap">{{ j.schedule }}</td><td>{{ j.covers }}</td><td>{{ nm(j.storage) }}</td><td class="muted">{{ j.keep }}</td><td class="r {{ '' if j.enabled else 't-warn' }}">{{ "on" if j.enabled else "switched off" }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="note">No backup jobs are set up</p>{% endif %}
+    {% if X.excluded %}<p class="note">Left out of backups: {% for e in X.excluded %}{{ e.name }} {{ e.disk }}{{ ", " if not loop.last }}{% endfor %}</p>{% endif %}
+    {% if X.points %}{% set unverified = X.points|selectattr("verify", "ne", "ok")|list %}
+    <p class="note">On the backup server: {{ X.points|sum(attribute="count") }} restore points for {{ X.points|length }} guests{% if unverified %}; the newest backup of {{ unverified|length }} guest{{ 's' if unverified|length != 1 }} isn't verified{% else %}; every newest backup is verified{% endif %}</p>{% endif %}
+  </section>
+  {% endif %}
   {% if "pbs" in on and v.pbs %}
   <section class="keep">
     {{ ptitle(16, "Backup server", "h3", "h3") }}
@@ -189,6 +263,14 @@
     {% endif %}
   </section>
   {% endif %}
+  {% if "replication" in on and X.replication %}
+  <section class="{{ 'flow' if X.replication|length > 12 else 'keep' }}">
+    {{ ptitle(25, "Replication", "h3", "h3") }}
+    <table class="t"><thead><tr><th>Guest</th><th>From → to</th><th>Schedule</th><th class="r">Last sync</th><th class="r">Took</th></tr></thead>
+    <tbody>{% for r in X.replication %}<tr><td class="name"><span class="id">{{ r.guest }}</span>{{ r.name }}</td><td class="nowrap">{{ r.source }} → {{ r.target }}</td><td class="muted">{{ r.schedule }}</td><td class="r nowrap {{ 't-bad' if r.fail_count }}">{{ r.last_text }}{% if r.fail_count %} · {{ r.fail_count }} failed{% endif %}</td><td class="r">{{ r.dur_text }}</td></tr>{% endfor %}</tbody></table>
+    {% if X.replication_more %}<p class="note">{{ X.replication_more }} more jobs, all in sync</p>{% endif %}
+  </section>
+  {% endif %}
   {% if "health" in on and v.health %}
   <section class="keep">
     {{ ptitle(17, "Cluster health", "h2", "ptitle h2-mid") }}
@@ -199,6 +281,41 @@
     </table>
   </section>
   {% endif %}
+  {% if "certificates" in on and X.certs %}
+  <section class="keep">
+    {{ ptitle(26, "Certificates", "h3", "h3") }}
+    <table class="t"><thead><tr><th>Where</th><th>Certificate</th><th class="r">Expires</th><th class="r">Left</th></tr></thead>
+    <tbody>{% for c in X.certs %}<tr><td>{{ nm(c.node) }}</td><td class="muted">{{ "cluster CA" if c.what == "ca" else c.name }}{% if c.acme %} · renews itself{% endif %}</td><td class="r nowrap">{{ c.until_text }}</td><td class="r nowrap {{ 't-' ~ c.tone if c.tone }}">{{ "expired" if c.days < 0 else c.days ~ " days" }}</td></tr>{% endfor %}</tbody></table>
+  </section>
+  {% endif %}
+  {% if "cluster_net" in on and X.cluster_net %}{% set cn = X.cluster_net %}
+  <section class="keep">
+    {{ ptitle(27, "Cluster network", "h3", "h3") }}
+    <table class="t"><thead><tr><th>Node</th><th>Corosync links</th></tr></thead>
+    <tbody>{% for l in cn.links %}<tr><td>{{ nm(l.node) }}</td><td class="mono small">{{ l.rings|join(" · ") or "–" }}</td></tr>{% endfor %}</tbody></table>
+    <p class="note">{% if cn.down %}Links that went down: {% for e in cn.down %}link {{ e.link }} to {{ e.peer }} {{ e.count }}× (seen by {{ e.seen_by }}){{ "; " if not loop.last }}{% endfor %}{% elif d.logs_collected %}No link went down in the logs {{ v.this }}{% endif %}{% if cn.links and cn.links[0].rings|length < 2 %}. One link per node: a second link keeps the cluster together when the first network fails{% endif %}{% if cn.qdevice %}. A QDevice adds a vote{% endif %}</p>
+  </section>
+  {% endif %}
+  {% if "security" in on and X.security %}{% set sec = X.security %}
+  <section class="keep">
+    {{ ptitle(28, "Sign-ins and firewall", "h3", "h3") }}
+    {% if sec.logins %}
+    <table class="t"><thead><tr><th>User</th><th>From</th><th class="r">Failed</th><th class="r">Last</th></tr></thead>
+    <tbody>{% for r in sec.logins %}<tr><td class="mono small">{{ r.user }}</td><td class="mono small">{{ r.rhost }}</td><td class="r {{ 't-warn' if r.count >= 10 }}">{{ r.count }}</td><td class="r nowrap">{{ r.last_text }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+    <p class="note">{% if not sec.logs_collected %}Sign-ins show once node logs are collected (needs Sys.Syslog){% elif not sec.logins %}No failed sign-ins {{ v.this }}{% else %}{{ sec.login_total }} failed sign-ins in all{% endif %}{% if sec.tickets %}; {{ sec.tickets }} requests with an expired or invalid session{% endif %}.
+      {% if sec.drops %}The host firewall blocked {{ sec.drops }} connections{% if sec.top_ports %}, mostly to port{{ 's' if sec.top_ports|length > 1 }} {% for p, n in sec.top_ports[:3] %}{{ p }}{{ ", " if not loop.last }}{% endfor %}{% endif %}{% if sec.top_src %}, most from {{ sec.top_src[0][0] }}{% endif %}.{% elif sec.fw_logging %}The host firewall blocked nothing it logged.{% else %}The host firewall isn't logging.{% endif %}</p>
+  </section>
+  {% endif %}
+  {% if "tasks" in on and X.tasks is defined %}
+  <section class="{{ 'flow' if X.tasks|length > 12 else 'keep' }}">
+    {{ ptitle(29, "Failed tasks", "h3", "h3") }}
+    {% if X.tasks %}
+    <table class="t"><tbody>{% for t in X.tasks %}<tr><td class="mono small muted nowrap when">{{ t.when }}</td><td class="name">{{ t.what }}{% if t.guest %} · {{ t.guest }}{% endif %}</td><td class="small t-bad name">{{ t.status[:90] }}</td><td class="r mono small muted nowrap">{{ t.user }}</td></tr>{% endfor %}</tbody></table>
+    {% if X.tasks_more %}<p class="note">{{ X.tasks_more }} more</p>{% endif %}
+    {% else %}<p class="note">No task failed {{ v.this }}, apart from any backups listed above</p>{% endif %}
+  </section>
+  {% endif %}
   {% if "logs" in on and v.logs %}
   <section class="{{ 'flow' if v.logs|length > 8 else 'keep' }}">
     {{ ptitle(18, "Errors in the logs", "h3", "h3") }}
@@ -206,6 +323,14 @@
     <table class="t">
       <tbody>{% for l in v.logs %}<tr><td class="mono small muted nowrap when">{{ l.when }}</td><td class="mono small nowrap">{{ l.node }} {{ l.unit }}</td><td class="{{ 't-bad' if l.level == 'error' }} small">{{ l.message[:110] }}{% if l.count > 1 %} <span class="muted">×{{ l.count }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
     </table>
+  </section>
+  {% endif %}
+  {% if "trends" in on and X.trends %}{% set tr = X.trends %}
+  <section class="keep">
+    {{ ptitle(30, "Trends", "h3", "h3") }}
+    <table class="t trend"><thead><tr><th></th>{% for l in tr.labels %}<th class="r {{ 'cur' if loop.last }}">{{ l }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for r in tr.rows %}<tr><td class="nowrap">{{ r.label }}</td>{% for c in r.cells %}<td class="r {{ 'cur' if loop.last }}">{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+    <p class="note">This {{ v.word }} is the last column. A period without data shows as –</p>
   </section>
   {% endif %}
 </div>
@@ -222,8 +347,8 @@
 
 {% macro rest() %}
 {% if style == "full" or on %}
-{% if "capacity" in on %}{{ capacity_page() }}{% endif %}
-{% if "guests" in on or "snapshots" in on or "changes" in on %}{{ guests_page() }}{% endif %}
-{% if "backups" in on or "health" in on or ("pbs" in on and v.pbs) or ("logs" in on and v.logs) %}{{ backups_page() }}{% endif %}
+{% if ["capacity", "storage_detail", "network", "pressure"]|select("in", on)|list %}{{ capacity_page() }}{% endif %}
+{% if ["guests", "snapshots", "changes", "guest_disks", "pools"]|select("in", on)|list %}{{ guests_page() }}{% endif %}
+{% if ["backups", "health", "pbs", "logs", "backup_coverage", "replication", "certificates", "cluster_net", "security", "tasks", "trends"]|select("in", on)|list %}{{ backups_page() }}{% endif %}
 {% endif %}
 {% endmacro %}
