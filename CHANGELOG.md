@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Weekly reports on the day you choose: Settings → Schedule picks the day; each report covers the 7 days
+  before it. Monday keeps calendar weeks ("Week 46"); other days are titled by date ("Week to Thu 20 Nov").
+
 - Quieter logs: WeasyPrint no longer writes a line for every page it lays out.
 
 - Fonts carry Greek letters, arrows and box drawing, so no symbol falls back to a system font.

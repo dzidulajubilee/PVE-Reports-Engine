@@ -457,7 +457,7 @@ def period_choices():
 
 
 def schedule_text(sch):
-    when = {"weekly": "weekly reports every Monday", "monthly": "monthly reports on the 1st",
+    when = {"weekly": f"weekly reports every {config.DAY_NAMES[config.WEEK_DAY]}", "monthly": "monthly reports on the 1st",
             "quarterly": "quarterly reports on the first day of each quarter"}
     parts = [when[k] for k in ("weekly", "monthly", "quarterly") if k in sch.get("kinds", [])]
     if not sch.get("enabled") or not parts:
@@ -759,6 +759,9 @@ def settings():
         try:
             port = int(f.get("port") or 587)
             hour = int(f.get("hour") or 7)
+            week_day = int(f.get("week_day") or 0)
+            if not 0 <= week_day <= 6:
+                raise ValueError
             warn = int(f.get("storage_warn") or 80)
             snap_days = int(f.get("snapshot_days") or 30)
             if not 0 <= hour <= 23 or not 50 <= warn <= 99 or not 1 <= snap_days <= 3650:
@@ -817,7 +820,7 @@ def settings():
         for k in ("weekly", "monthly", "quarterly"):
             s["recipients"][k] = ", ".join(R.split_addresses(f.get(f"to_{k}", "")))
             s["recipients_summary"][k] = ", ".join(R.split_addresses(f.get(f"to_s_{k}", "")))
-        s["schedule"].update(enabled=bool(f.get("enabled")), hour=hour,
+        s["schedule"].update(enabled=bool(f.get("enabled")), hour=hour, week_day=week_day,
                              kinds=[k for k in ("weekly", "monthly", "quarterly") if f.get(f"auto_{k}")])
         R.save_settings(s)
         if logo or f.get("remove_logo"):
@@ -877,6 +880,7 @@ def settings_context(s, lk):
         preview_made=preview_made(),
         backfill=backfill_state(), logs_from=R.db.get_state("logs_from"),
         fmt=lambda t: dt.datetime.fromtimestamp(int(t), config.TZ).strftime("%-d %b %H:%M") if t else "never",
+        day_names=config.DAY_NAMES,
     )
 
 

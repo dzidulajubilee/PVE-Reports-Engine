@@ -99,7 +99,7 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
     v = view(d, p, kind, st, shown)
     title, dates = period_label(kind, start, end)
     name = st["general"]["name"].strip()
-    week_word = {"weekly": f"week {start.isocalendar().week}", "monthly": f"{start:%B %Y}",
+    week_word = {"weekly": title[0].lower() + title[1:], "monthly": f"{start:%B %Y}",
                  "quarterly": f"Q{(start.month - 1) // 3 + 1} {start.year}"}.get(kind, title)
     cl = CHART_LOOK[template]
     w = CONTENT_WIDTH[template]
@@ -116,7 +116,7 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
                                          dates if kind != "custom" else title) if x)
     if template == "ledger":
         footer_left = f"{(name or 'cluster').lower().replace(' ', '-')} · {noun.lower()}-report · " + (
-            f"{start:%G}-W{start.isocalendar().week:02d}" if kind == "weekly" else f"{start:%Y-%m-%d}")
+            f"{start:%G}-W{start.isocalendar().week:02d}" if kind == "weekly" and start.weekday() == 0 else f"{start:%Y-%m-%d}")
     cl = d.get("cluster_name") or ("Proxmox cluster" if d.get("topology", {}).get("cluster", True) else "Proxmox server")
     kicker = name if name and name.lower() == cl.lower() else f"{name or 'Proxmox'} · {cl}"  # never "Acme · Acme"
     env = environment()

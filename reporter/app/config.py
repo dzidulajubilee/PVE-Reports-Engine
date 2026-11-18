@@ -10,6 +10,10 @@ from zoneinfo import ZoneInfo
 # Report time zone. Starts from $TZ; the portal's setting overrides it (see load_settings).
 TZ = ZoneInfo(os.environ.get("TZ") or "UTC")
 
+# The day weekly reports are made, 0 = Monday: each covers the 7 days before it. Set from Settings.
+WEEK_DAY = 0
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
 OUT = Path(os.environ.get("OUT_DIR", "/out"))
 ROOT = Path(__file__).resolve().parent.parent  # reporter/: templates/ and fonts/ live here
 
@@ -175,6 +179,7 @@ def default_settings():
         "schedule": {
             "enabled": True,
             "hour": int(env("SEND_HOUR", 7)),
+            "week_day": int(env("WEEK_DAY", 0)),  # weekly reports: the day they're made, 0 = Monday
             "kinds": env("REPORTS", "weekly,monthly,quarterly").split(","),
         },
     }
@@ -189,6 +194,11 @@ def load_settings():
     except FileNotFoundError:
         pass
     set_timezone(s["general"]["timezone"])
+    global WEEK_DAY
+    try:
+        WEEK_DAY = min(6, max(0, int(s["schedule"].get("week_day", 0))))
+    except (TypeError, ValueError):
+        WEEK_DAY = 0
     return s
 
 

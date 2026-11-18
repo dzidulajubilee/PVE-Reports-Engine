@@ -14,7 +14,7 @@ def period_end(kind, now):
     """Start of the current (unfinished) period = end of the last closed one."""
     d = now.astimezone(config.TZ).date()
     if kind == "weekly":
-        d -= dt.timedelta(days=d.weekday())
+        d -= dt.timedelta(days=(d.weekday() - config.WEEK_DAY) % 7)  # weeks start on the chosen day
     elif kind == "monthly":
         d = d.replace(day=1)
     else:
@@ -36,7 +36,9 @@ def period_start(kind, end, length=None):
 def period_label(kind, start, end):
     last = end - dt.timedelta(days=1)
     if kind == "weekly":
-        return (f"Week {start.isocalendar().week}", f"{start:%-d %b} – {last:%-d %b %Y}")
+        if start.weekday() == 0:  # a calendar week keeps its number
+            return (f"Week {start.isocalendar().week}", f"{start:%-d %b} – {last:%-d %b %Y}")
+        return (f"Week to {last:%a %-d %b}", f"{start:%-d %b} – {last:%-d %b %Y}")
     if kind == "monthly":
         return f"{start:%B %Y}", f"{start:%-d %b} – {last:%-d %b %Y}"
     if kind == "custom":
@@ -58,7 +60,7 @@ def trend_periods(kind, start):
     for _ in range(TREND_COUNT[kind]):
         e_ = _next_period(kind, s_)
         if kind == "weekly":
-            label = f"W{s_.isocalendar().week}"
+            label = f"W{s_.isocalendar().week}" if s_.weekday() == 0 else f"{s_:%-d %b}"
         elif kind == "monthly":
             label = f"{s_:%b}"
         else:

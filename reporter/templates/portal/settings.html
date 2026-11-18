@@ -44,6 +44,8 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
 .file-pick input[type=file]:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
 .file-name { font-size: 13px; color: var(--ink-3); overflow-wrap: anywhere; }
 .file-name.chosen { color: var(--ink); }
+.week-row { display: flex; align-items: center; gap: 8px; }
+.week-row select { width: auto; padding: 4px 8px; }
 .accent-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .sw { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--rule-2); cursor: pointer; padding: 0; transition: transform .1s; }
 .sw:active { transform: scale(.96); }
@@ -219,7 +221,10 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
     <h2>Schedule</h2>
     <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if s.schedule.enabled }}> Make reports automatically</label>
     <div style="margin:8px 0 16px 38px">
-      {% for k, l in [('weekly','Weekly, every Monday'),('monthly','Monthly, on the 1st'),('quarterly','Quarterly, on 1 Jan, Apr, Jul and Oct')] %}
+      <div class="check week-row"><label class="check" style="margin:0"><input type="checkbox" name="auto_weekly" {{ 'checked' if 'weekly' in s.schedule.kinds }}> Weekly, every</label>
+        <select name="week_day" aria-label="Day weekly reports are made">{% for n in day_names %}<option value="{{ loop.index0 }}" {{ 'selected' if (s.schedule.week_day or 0) == loop.index0 }}>{{ n }}</option>{% endfor %}</select></div>
+      <p class="hint" style="margin:-4px 0 8px">Each weekly report covers the 7 days before that day. Monday gives calendar weeks, Monday to Sunday</p>
+      {% for k, l in [('monthly','Monthly, on the 1st'),('quarterly','Quarterly, on 1 Jan, Apr, Jul and Oct')] %}
       <label class="check"><input type="checkbox" name="auto_{{ k }}" {{ 'checked' if k in s.schedule.kinds }}> {{ l }}</label>
       {% endfor %}
     </div>
