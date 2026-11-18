@@ -939,6 +939,8 @@ def logo_preview():
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s", stream=sys.stdout)
+    for noisy in ("weasyprint", "fontTools"):  # a line per laid-out page otherwise
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     R.load_settings()
     users.setup_code()  # logs the code once when there are no accounts yet
     for target in (worker, scheduler, snapshot.loop):

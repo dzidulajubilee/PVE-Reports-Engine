@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Quieter logs: WeasyPrint no longer writes a line for every page it lays out.
+
 - Fonts carry Greek letters, arrows and box drawing, so no symbol falls back to a system font.
 - Page flow: longer tables (over 8 rows) flow across pages; a data note stays with the block above it; Rack and
   network headings never end a page; Ledger keeps its data note under the header.

@@ -120,6 +120,8 @@ def logs_cmd(a):
 def main():
     load_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
+    for noisy in ("weasyprint", "fontTools"):  # a line per laid-out page otherwise
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     ap = argparse.ArgumentParser(prog="report.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="make a report now")
