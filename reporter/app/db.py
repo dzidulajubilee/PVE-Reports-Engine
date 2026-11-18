@@ -48,6 +48,7 @@ create table if not exists logs (
   unique (t, source, node, message)
 );
 create index if not exists logs_t on logs (t);
+create table if not exists unreachable (t integer primary key);  -- rounds the reporter couldn't reach Proxmox
 create table if not exists state (key text primary key, value text);
 """
 
@@ -108,7 +109,7 @@ def set_state(key, value):
 def prune(now):
     cut = int(now - KEEP_DAYS * 86400)
     with tx() as c:
-        for t in ("snap_cluster", "snap_node", "snap_guest", "snap_storage", "logs"):
+        for t in ("snap_cluster", "snap_node", "snap_guest", "snap_storage", "logs", "unreachable"):
             c.execute(f"delete from {t} where t < ?", (cut,))  # noqa: S608 - fixed table names
         # AppArmor audit lines kept by earlier versions (see snapshot.NOISE)
         c.execute("delete from logs where unit = 'kernel' and message like 'audit: type=%apparmor=%'")

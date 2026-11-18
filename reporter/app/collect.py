@@ -331,6 +331,12 @@ def logged_events(start, end, recorded=()):
     return out
 
 
+def unreachable_between(start, end):
+    """[(from, to)] stretches when the reporter tried and no node answered."""
+    rows = db.query("select t from unreachable where t >= ? and t < ? order by t", start, end)
+    return intervals([(r["t"], True) for r in rows]) if rows else []
+
+
 def logs_between(start, end, limit=20):
     """Warnings and errors from the collected logs, the same message on the same node counted once."""
     rows = db.query("select t, source, node, level, unit, message from logs where t >= ? and t < ? and level != 'info' "
@@ -356,7 +362,8 @@ def collect(S, start, end, settings, full=True, now=None):
     now = now or time.time()
     tz = config.TZ
     s_, e_ = ts(start), ts(end)
-    d = {"start": s_, "end": e_, "days": max(1, round((e_ - s_) / DAY)), "buckets": buckets(start, end)}
+    d = {"start": s_, "end": e_, "days": max(1, round((e_ - s_) / DAY)), "buckets": buckets(start, end),
+         "now": int(now)}  # node uptimes are counted back from this moment
     bks = d["buckets"]
     d["coverage"] = snapshot_coverage(s_, e_)
 
@@ -369,6 +376,16 @@ def collect(S, start, end, settings, full=True, now=None):
     online = [n["node"] for n in nodes_res if n.get("status") == "online"]
     cluster = next((x for x in status if x.get("type") == "cluster"), {})
     d["cluster_name"] = cluster.get("name")
+    # what kind of setup this is decides wording, availability and which checks apply
+    d["topology"] = {
+        "cluster": bool(cluster),  # a standalone node has no cluster entry
+        "nodes": len(nodes_res),
+        "shared": any(r.get("shared") and "backup" != (storage_cfg.get(r["storage"], {}).get("content") or "backup")
+                      for r in stores_res),
+        "node_ips": {x.get("name"): x.get("ip") for x in status if x.get("type") == "node"},
+    }
+    if not d["topology"]["cluster"] and not d["cluster_name"]:
+        d["cluster_name"] = nodes_res[0]["node"] if len(nodes_res) == 1 else None
     d["api_ok"] = bool(res)
 
     # ---- availability: quorum and nodes, from the snapshots
@@ -382,6 +399,7 @@ def collect(S, start, end, settings, full=True, now=None):
     lf = db.get_state("logs_from")
     d["logs_cover"] = bool(lf) and int(lf) <= s_
     d["logged"] = logged_events(s_, e_, d["recorded"])
+    d["unreachable"] = unreachable_between(s_, e_)
 
     # ---- backups (tasks are kept by Proxmox, so this works for past periods too)
     tasks = []
@@ -810,7 +828,10 @@ def collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now
     h = []
     cov = d["coverage"]
     lost = sc["quorum_lost"]
-    if cov >= 0.5:
+    single = not d["topology"]["cluster"]
+    if single:
+        pass  # a standalone node has no quorum to keep
+    elif cov >= 0.5:
         if lost:
             mins = sum(b - a for a, b in lost) / 60
             h.append(("quorum", "Quorum", f"lost {len(lost)}× for {fmt_minutes(mins)}", "bad"))
@@ -831,16 +852,22 @@ def collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now
             else:
                 h.append(("quorum", "Quorum", "quorate now; earlier not recorded", "ok"))
     down = [n for n in nodes if n["down"]]
+    what = "Server" if single else "Nodes online"
     if down:
         parts = [f"{n['name']} down {fmt_minutes(n['down_s'] / 60)}" for n in down]
-        h.append(("nodes", "Nodes online", ", ".join(parts), "bad"))
+        h.append(("nodes", what, ", ".join(parts), "bad"))
     else:
         off = [n["name"] for n in nodes if not n["online"]]
         if off:
-            h.append(("nodes", "Nodes online", f"{', '.join(off)} offline now", "bad"))
+            h.append(("nodes", what, f"{', '.join(off)} offline now", "bad"))
+        elif single:
+            h.append(("nodes", what, "up all period" if cov >= 0.95 else "up now", "ok"))
         else:
-            h.append(("nodes", "Nodes online", f"{len(nodes)} of {len(nodes)}" + (" all period" if cov >= 0.95 else ""),
+            h.append(("nodes", what, f"{len(nodes)} of {len(nodes)}" + (" all period" if cov >= 0.95 else ""),
                       "ok"))
+    if d.get("unreachable"):
+        mins = sum(b - a for a, b in d["unreachable"]) / 60
+        h.append(("reach", "Reachable from the reporter", f"no answer for {fmt_minutes(mins)}", "warn"))
 
     ha = S.get("/cluster/ha/status/current")
     if ha:
@@ -1004,7 +1031,8 @@ def collect_pbs(S, s_, e_):
         full = u.get("estimated-full-date")
         stores.append({"name": u.get("store"), "used": u.get("used"), "total": u.get("total"),
                        "pct": 100 * u["used"] / u["total"] if u.get("used") is not None else None,
-                       "full_date": full if isinstance(full, (int, float)) and full > 0 else None,
+                       # PBS sometimes estimates a date already past (e.g. when use fell): that's no forecast
+                       "full_date": full if isinstance(full, (int, float)) and full > time.time() else None,
                        "gc": (u.get("gc-status") or {}).get("upid") is not None})
     tasks = S.pbs_get("/nodes/localhost/tasks", since=s_, until=e_, limit=5000)
     kinds = defaultdict(lambda: {"ok": 0, "failed": 0})

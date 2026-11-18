@@ -77,6 +77,9 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
     <div class="field"><label for="pve_fingerprint">Or certificate fingerprints (SHA-256)</label>
       <input type="text" id="pve_fingerprint" name="pve_fingerprint" value="{{ s.pve.fingerprint }}" class="mono" placeholder="AB:CD:…">
       <div class="hint">In the Proxmox web UI: node → System → Certificates → pveproxy-ssl.pem. One per node, separated by commas. install.sh fills these in for you</div></div>
+    {% if missing_nodes %}
+    <p class="flash" style="margin:0 0 12px">This cluster has {{ missing_nodes|length + s.pve.hosts|length }} nodes but {{ missing_nodes|length }} aren't listed above, so reports stop when the listed one is down. Add: <span class="mono">{{ missing_nodes|join(', ') }}</span>{% if s.pve.fingerprint and not s.pve.ca_pem %}, with each one's fingerprint (or paste the cluster CA instead, which covers them all){% endif %}</p>
+    {% endif %}
     <div class="test-row"><button type="button" class="btn quiet small" data-test="pve">Test connection</button><span class="result" id="pve-result"></span></div>
     {% if snapshot_error %}<p class="hint" style="color:var(--bad)">Last problem: {{ snapshot_error.split(' ', 1)[1] if ' ' in snapshot_error else snapshot_error }}</p>{% endif %}
     <div class="field" style="margin:16px 0 0"><label for="pve_url">Proxmox web address for links in the PDFs</label>

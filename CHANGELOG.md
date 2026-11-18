@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Single node or cluster: each report works out the setup and follows it. A standalone node reads as a server
+  ("Server up", no quorum lines); a cluster with only local disks charts every node's storage, the fullest in
+  the accent colour.
+- Node uptime counters are used as recorded facts: a node that booted before the period began ran all of it,
+  so the timeline and a single server's "Server up" are shown even before the reporter was installed.
+- Rounds where no node answered are recorded and reported as "no answer for N min", never as downtime.
+- Settings lists cluster nodes missing from the addresses, so reports can fail over.
+- The backup server's estimated full date is ignored when it is already past.
+
 - Backup server: backups in namespaces (such as Production) are found; the fingerprint Proxmox VE already
   trusts for the backup server is filled in automatically; a token that sees no datastore is reported as a
   missing permission; the certificate error no longer points to the Proxmox VE CA file.

@@ -170,6 +170,37 @@ def main_storage(storage):
     return max(local, key=lambda s: s["pct"]) if local else None
 
 
+def booted(d, n):
+    """When a node last started, from its uptime counter, or None."""
+    return d.get("now", d["end"]) - n["uptime"] if n.get("uptime") else None
+
+
+def ran_through(d, n):
+    """True when the node's own uptime counter proves it ran the whole period (it started before the period did
+    and hasn't restarted since): a recorded fact, not an estimate."""
+    b = booted(d, n)
+    return b is not None and b <= d["start"]
+
+
+def chart_rows(rows, main):
+    """What the capacity chart draws: shared storage when there is some, else each node's main guest storage, so
+    a cluster with only local disks shows every node and a single node shows its own."""
+    if not main:
+        return [], ""
+    if main["shared"]:
+        return [main], f"{main['label']} used, last 12 weeks"
+    per_node = {}
+    for r in rows:
+        if r["backup_only"] or r["shared"] or r["pct"] is None or not r["history"]:
+            continue
+        if r["node"] not in per_node or (r["total"] or 0) > (per_node[r["node"]]["total"] or 0):
+            per_node[r["node"]] = r  # a node's largest guest storage is the one that matters
+    lines = sorted(per_node.values(), key=lambda r: -r["pct"])[:8]
+    if len(lines) <= 1:
+        return [main], f"{main['label']} used, last 12 weeks"
+    return lines, "Guest storage per node, last 12 weeks"
+
+
 def view(d, p, kind, settings, on=None):
     """Everything a template shows, worked out once. d: this period, p: the period before (light collection)."""
     word = {"weekly": "week", "monthly": "month", "quarterly": "quarter"}.get(kind, "period")
@@ -199,6 +230,7 @@ def view(d, p, kind, settings, on=None):
     v["storage"] = rows
     main = main_storage(d["storage"])
     v["main"] = next((r for r in rows if main and r["name"] == main["name"] and r["node"] == main["node"]), None)
+    v["chart_rows"], v["chart_caption"] = chart_rows(rows, v["main"])
 
     # ---- figures
     pm = None
@@ -206,7 +238,8 @@ def view(d, p, kind, settings, on=None):
         pm = next((s for s in p.get("storage", []) if s["name"] == main["name"] and s["node"] == main["node"]), None)
     gr, pgr = d.get("guests_running"), p.get("guests_running")
     figs = []
-    figs.append({"key": "available", "label": "Cluster available", "value": fpct(d["available_pct"], 0 if (d["available_pct"] or 0) >= 99.95 or d["available_pct"] is None else 2),
+    single = not d.get("topology", {}).get("cluster", True)
+    figs.append({"key": "available", "label": "Server up" if single else "Cluster available", "value": fpct(d["available_pct"], 0 if (d["available_pct"] or 0) >= 99.95 or d["available_pct"] is None else 2),
                  "of": "", "change": change_pts(d["available_pct"], p.get("available_pct"), word, fair_rates and cov >= 0.7)
                  .replace(" pts", " pts") if d["available_pct"] is not None else "not recorded yet", "tone": ""})
     if d["available_pct"] is not None and p.get("available_pct") is not None and fair_rates and abs(d["available_pct"] - p["available_pct"]) < 0.05:
@@ -214,7 +247,10 @@ def view(d, p, kind, settings, on=None):
     if d["available_pct"] is not None and (d["available_pct"] < 99.9):
         figs[-1]["tone"] = "bad"
     lost_logged = [e for e in d.get("logged", []) if e["kind"] == "lost"]
-    if d["available_pct"] is None:  # nothing recorded: no percentage, only what the nodes logged
+    if d["available_pct"] is None and single and d["nodes"] and ran_through(d, d["nodes"][0]):
+        # one server whose uptime counter covers the whole period: it was up all of it
+        figs[-1].update(value="100%", change=f"running since {when(booted(d, d['nodes'][0]), '%-d %b')} (uptime)")
+    elif d["available_pct"] is None:  # nothing recorded: no percentage, only what the nodes logged
         if lost_logged:
             figs[-1].update(change=f"quorum loss logged {times(len(lost_logged))}", tone="bad")
         elif d.get("logs_cover"):
@@ -497,12 +533,27 @@ def sentences(d, v, word, this, n_nodes):
         head = f"{mood} {word} with {plural(len(bad), 'thing')} to fix: {join(bits)}."
     facts = []
     nodes = d["nodes"]
+    single = not d.get("topology", {}).get("cluster", True)
     q = "lost quorum" if d["quorum_lost"] else "kept quorum" if d["coverage"] >= 0.5 else None
     down = [n for n in nodes if n["down"]]
     nodes_part = (f"{join([n['name'] for n in down])} went down" if down else
                   ("every node stayed up" if d["coverage"] >= 0.5 else None))
-    if q and nodes_part:
+    through = [n for n in nodes if ran_through(d, n)]
+    if single and d["coverage"] >= 0.5:
+        facts.append(f"{nodes[0]['name']} went down." if down else "The server stayed up.")
+    elif single and nodes and through:
+        facts.append(f"The server has been running since {when(booted(d, nodes[0]), '%-d %b')}, by its uptime counter.")
+    elif q and nodes_part:
         facts.append(f"The cluster {q} and {nodes_part}.")
+    elif single:
+        facts.append(f"The reporter didn't record all of this {word}, and the server restarted on "
+                     f"{when(booted(d, nodes[0]), '%a %-d %b')}." if nodes and booted(d, nodes[0]) else
+                     f"The reporter didn't record this {word}.")
+    elif d["coverage"] < 0.5 and through and len(through) == len(nodes):
+        lost_logged = [e for e in d.get("logged", []) if e["kind"] == "lost"]
+        tail = (f"; Proxmox logged {plural(len(lost_logged), 'quorum loss', 'quorum losses')}" if lost_logged else
+                "; Proxmox logged no quorum loss or fencing" if d.get("logs_cover") else "")
+        facts.append(f"Every node has been running since before this {word} began, by their uptime counters{tail}.")
     elif d["coverage"] < 0.5:
         rec = "didn't record" if d["coverage"] == 0 else f"recorded only {d['coverage']:.0%} of"
         lost_logged = [e for e in d.get("logged", []) if e["kind"] == "lost"]
@@ -582,7 +633,7 @@ def backup_line(b, word, this):
 def capacity_line(main, warn_pct, word):
     if not main:
         return "No storage figures could be read."
-    who = "Shared storage" if main["shared"] else main["label"]
+    who = "Shared storage" if main["shared"] else f"The fullest guest storage, {main['on']},"
     if main["per_week"] is None:
         return f"{who} is {main['pct_text']} full."
     if main["steady"] or main["per_week"] <= 0:
@@ -712,6 +763,11 @@ def timeline(d, v, warn_pct):
             last = max(last, rb)
         if last < e_:
             unrec.append((last, e_))
+        boot = booted(d, node)
+        if boot is not None and boot < e_:  # its uptime counter proves it ran from boot onwards
+            segs.append((max(s_, boot), e_))
+            bars = [{"left": 100 * (a - s_) / span, "width": max(0.5, 100 * (b - a) / span)} for a, b in segs]
+            unrec = [(a, min(b, boot)) for a, b in unrec if a < boot]
         norec = [{"left": 100 * (a - s_) / span, "width": 100 * (b - a) / span} for a, b in unrec if b - a > 900]
         marks = {}
 
@@ -884,6 +940,10 @@ def areas(d, v, word, n_nodes):
     av = by("availability")
     if av:
         text = av[0]["plain"]
+    elif n_nodes == 1 and g["ran_all"] is not None:
+        text = f"The server and {g['ran_all']} of {g['total']} systems ran the whole {word}"
+    elif n_nodes == 1:
+        text = f"The server is up and {g['running']} of {g['total']} systems are running"
     elif g["ran_all"] is not None:
         text = f"All {servers} and {g['ran_all']} of {g['total']} systems ran the whole {word}"
     else:

@@ -10,7 +10,7 @@ import time
 
 from . import db
 from .config import load_settings, log
-from .pve import describe, pve_client
+from .pve import ApiError, CertificateMismatch, describe, pve_client
 
 INTERVAL = 300
 DAY = 86400
@@ -210,4 +210,8 @@ def loop():
         except Exception as e:  # noqa: BLE001
             log.warning("snapshot failed: %s", e)
             db.set_state("last_snapshot_error", f"{int(started)} {e}")
+            # no node answered at all (not a refusal): a fact worth reporting, but not proof the cluster was down
+            if isinstance(e, ApiError) and e.status is None and not isinstance(e, CertificateMismatch):
+                with db.tx() as c:
+                    c.execute("insert or ignore into unreachable values (?)", (int(started),))
         time.sleep(max(30, INTERVAL - (time.time() - started)))

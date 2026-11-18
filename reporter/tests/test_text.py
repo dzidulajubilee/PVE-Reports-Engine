@@ -77,6 +77,8 @@ def test_unrecorded_time_is_never_drawn_or_counted_as_up():
     st = config.load_settings()
     start, end, d, p = fake_report.typical()
     d.update(coverage=0.0, available_pct=None, recorded=[], logs_cover=True, logged=[])
+    for n in d["nodes"]:
+        n["uptime"] = None  # no uptime counter either: nothing proves they ran
     v = view(d, p, "weekly", st)
     assert v["fig"]["available"]["value"] == "–"
     assert v["fig"]["available"]["change"] == "not recorded; no quorum loss logged"
@@ -95,3 +97,27 @@ def test_logged_quorum_loss_is_reported_as_a_fact():
     assert v["fig"]["available"]["change"] == "quorum loss logged once"
     a = v["attention"][0]
     assert a["level"] == "bad" and a["text"].startswith("Quorum lost Tue 10 Nov 03:00, back Tue 03:10 (logged by hv-02)")
+
+
+def test_single_node_reads_as_a_server():
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    d["topology"] = {"cluster": False, "nodes": 1, "shared": False, "node_ips": {}}
+    d["nodes"] = d["nodes"][:1]
+    d.update(coverage=0.0, available_pct=None, recorded=[], logged=[])
+    d["nodes"][0]["uptime"] = 41 * 86400  # booted long before the week: its counter proves it ran throughout
+    v = view(d, p, "weekly", st)
+    assert v["fig"]["available"]["label"] == "Server up" and v["fig"]["available"]["value"] == "100%"
+    assert "(uptime)" in v["fig"]["available"]["change"]
+    assert "The server has been running since" in v["subline"] and "quorum" not in v["subline"]
+    lane = v["timeline"]["lanes"][0]
+    assert lane["bars"] and not lane["norec"]
+
+
+def test_local_only_cluster_charts_every_node():
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    d["storage"] = [s for s in d["storage"] if not s["shared"]]
+    v = view(d, p, "weekly", st)
+    assert [r["node"] for r in v["chart_rows"]] == ["hv-03", "hv-01", "hv-02"]
+    assert v["chart_caption"] == "Guest storage per node, last 12 weeks"

@@ -54,7 +54,7 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
 
 {% block body %}
 <section class="summary">
-  <div class="top"><span class="t1">cluster-report {{ week_word|lower }}</span><span class="t2">{{ start.strftime('%Y-%m-%d') }} → {{ last.strftime('%Y-%m-%d') }} · {{ (name or "cluster")|lower|replace(" ", "-") }} · {{ v.nodes|length }} nodes · {{ d.guests.total }} guests</span></div>
+  <div class="top"><span class="t1">{{ noun|lower }}-report {{ week_word|lower }}</span><span class="t2">{{ start.strftime('%Y-%m-%d') }} → {{ last.strftime('%Y-%m-%d') }} · {{ (name or "cluster")|lower|replace(" ", "-") }} · {{ v.nodes|length }} node{{ 's' if v.nodes|length != 1 }} · {{ d.guests.total }} guests</span></div>
   <div class="counts"><span><span class="ok">ok</span> {{ v.counts.ok }}</span><span><span class="warn">warn</span> {{ v.counts.warn }}</span><span><span class="fail">fail</span> {{ v.counts.fail }}</span><span class="gen">generated {{ generated.strftime('%Y-%m-%d %H:%M') }} · data coverage {{ "%.0f"|format(100 * d.coverage) }}%</span></div>
 
   <section class="{{ 'flow' if v.findings|length > 12 else 'keep' }}">

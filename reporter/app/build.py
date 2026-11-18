@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup
 
 from . import config, layout
-from .charts import heatmap, storage_chart
+from .charts import heatmap, storage_lines
 from .collect import collect
 from .config import OUT, STYLES, TEMPLATES, load_settings, log, logo_path, look
 from .periods import period_end, period_label, period_start, report_path
@@ -60,8 +60,8 @@ def environment():
     return env
 
 
-def report_name(kind, title):
-    return f"{kind.capitalize()} cluster report, {title}" if kind != "custom" else f"Cluster report for {title}"
+def report_name(kind, title, noun="Cluster"):
+    return f"{kind.capitalize()} {noun.lower()} report, {title}" if kind != "custom" else f"{noun} report for {title}"
 
 
 def render(kind, start, end, d, p, st, style, shown, template=None, accent=None, generated=None):
@@ -77,7 +77,7 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
                  "quarterly": f"Q{(start.month - 1) // 3 + 1} {start.year}"}.get(kind, title)
     cl = CHART_LOOK[template]
     w = CONTENT_WIDTH[template]
-    chart = storage_chart(v["main"], v["warn_pct"], accent, d["end"], w=w, h=280 if style == "full" else 200,
+    chart = storage_lines(v["chart_rows"], v["warn_pct"], accent, d["end"], w=w, h=280 if style == "full" else 200,
                           mono=cl["mono"], ink=cl["ink"], muted=cl["muted"], fs=cl.get("fs", 12))
     heat_w = w - 96
     heat = heatmap(v["heat"]["rows"], accent, w=heat_w) if template == "pulse" else []
@@ -85,17 +85,18 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
     logo = logo_path()
     generated = generated or dt.datetime.now(config.TZ)
     period_word = {"weekly": "week", "monthly": "month", "quarterly": "quarter"}.get(kind, "period")
-    footer_left = " · ".join(x for x in (name, "Cluster report" if template != "briefing" else "Cluster briefing",
+    noun = "Cluster" if d.get("topology", {}).get("cluster", True) else "Server"  # a standalone node is a server
+    footer_left = " · ".join(x for x in (name, f"{noun} report" if template != "briefing" else f"{noun} briefing",
                                          dates if kind != "custom" else title) if x)
     if template == "ledger":
-        footer_left = f"{(name or 'cluster').lower().replace(' ', '-')} · cluster-report · " + (
+        footer_left = f"{(name or 'cluster').lower().replace(' ', '-')} · {noun.lower()}-report · " + (
             f"{start:%G}-W{start.isocalendar().week:02d}" if kind == "weekly" else f"{start:%Y-%m-%d}")
-    cl = d.get("cluster_name") or "Proxmox cluster"
+    cl = d.get("cluster_name") or ("Proxmox cluster" if d.get("topology", {}).get("cluster", True) else "Proxmox server")
     kicker = name if name and name.lower() == cl.lower() else f"{name or 'Proxmox'} · {cl}"  # never "Acme · Acme"
     env = environment()
     return env.get_template(f"reports/{template}/report.html").render(
         T=template, name=name, kind=kind, title=title, dates=dates, week_word=week_word, period_word=period_word,
-        report_title=report_name(kind, title), start=start, end=end, last=end - dt.timedelta(days=1),
+        report_title=report_name(kind, title, noun), noun=noun, start=start, end=end, last=end - dt.timedelta(days=1),
         style=style, on=shown, d=d, p=p, v=v, chart=chart, heat=heat, heat_w=heat_w,
         accent=accent, accent_ink=accent_ink, ok=config.OK, warn=config.WARN, bad=config.BAD,
         fonts=(config.ROOT / "fonts").as_uri(), logo=logo.as_uri() if logo else None, generated=generated,
@@ -136,7 +137,7 @@ def build(kind, end=None, start=None):
     v = view(d, p, kind, st, show["full"])
     lines = [v["headline"], v["subline"]] + [f"– {a['text']}" for a in v["attention"][:6]]
     name = st["general"]["name"].strip()
-    what = report_name(kind, title)
+    what = report_name(kind, title, "Cluster" if d.get("topology", {}).get("cluster", True) else "Server")
     subject = f"{name}: {what} ({dates})" if name else f"{what} ({dates})"
     log.info("wrote %s and its summary (%d API calls failed)", pdfs["full"], len(S.errors))
     return pdfs, subject, lines, len(S.errors), layout_issues

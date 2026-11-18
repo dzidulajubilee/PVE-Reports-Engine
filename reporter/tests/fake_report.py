@@ -195,7 +195,8 @@ def typical(kind="weekly"):
         {"t": T(5, 9, 0), "source": "journal", "node": "hv-01", "level": "warning", "unit": "corosync",
          "message": "[KNET  ] link: host: 2 link: 0 is down", "count": 1, "first": T(5, 9, 0)},
     ]
-    d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 1.0,
+    d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 1.0, "now": e_ + 3600,
+         "topology": {"cluster": True, "nodes": 3, "shared": True, "node_ips": {}},
          "cluster_name": "example", "api_ok": True, "quorum_lost": [], "available_pct": 100.0,
          "tasks_read": True, "recorded": [(s_, e_)], "logged": [], "logs_cover": True, "backups": backups, "storage": storage, "nodes": nodes, "guests": guests,
          "guests_running": {"running": len(running), "total": len(gl)}, "changes": changes, "snapshots": snapshots,
@@ -217,7 +218,8 @@ def empty(kind="weekly"):
     start, end = _period(kind)
     s_, e_ = int(start.timestamp()), int(end.timestamp())
     bks = buckets(start, end)
-    d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 0.0,
+    d = {"start": s_, "end": e_, "days": round((e_ - s_) / DAY), "buckets": bks, "coverage": 0.0, "now": e_ + 3600,
+         "topology": {"cluster": False, "nodes": 1, "shared": False, "node_ips": {}},
          "cluster_name": None, "api_ok": True, "quorum_lost": [], "available_pct": None, "tasks_read": True,
          "recorded": [], "logged": [], "logs_cover": False,
          "backups": {"runs_total": 0, "runs_ok": 0, "runs_failed": 0, "rows": [], "failures": [],

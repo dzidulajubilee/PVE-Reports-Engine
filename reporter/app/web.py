@@ -830,7 +830,29 @@ def settings():
         return redirect(url_for("settings"))
     lk = config.look(s)
     return render_template(
-        "settings.html", s=s, has_password=bool(s["smtp"].get("password")),
+        "settings.html", missing_nodes=missing_nodes(s), **settings_context(s, lk))
+
+
+def missing_nodes(s):
+    """Addresses of cluster nodes missing from Settings, so reports can't fail over to them."""
+    if not s["pve"]["hosts"] or not s["pve"]["token_id"]:
+        return []
+    from .pve import pve_client
+
+    try:
+        status = pve_client(s).get("/cluster/status") or []
+    except Exception:  # noqa: BLE001 - only a hint
+        return []
+    given = {h.split("://")[-1].split(":")[0].strip("[]").lower() for h in s["pve"]["hosts"]}
+    if not any(x.get("type") == "cluster" for x in status):
+        return []  # a standalone node: nothing to fail over to
+    return [x.get("ip") or x["name"] for x in status if x.get("type") == "node"
+            and x["name"].lower() not in given and (x.get("ip") or "").lower() not in given]
+
+
+def settings_context(s, lk):
+    return dict(
+        s=s, has_password=bool(s["smtp"].get("password")),
         has_pve_secret=bool(s["pve"].get("token_secret")), has_pbs_secret=bool(s["pbs"].get("token_secret")),
         sections=config.SECTIONS, timezones=R.timezones(), templates=config.TEMPLATES, template=lk["template"],
         accent=lk["accent"], accents=config.ACCENTS, all_accents={t: (s["general"].get("accents") or {}).get(t, x["accent"])

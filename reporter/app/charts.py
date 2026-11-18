@@ -84,6 +84,73 @@ def storage_chart(row, warn_pct, accent, end, w=650, h=280, mono="IBM Plex Mono"
     return "".join(out)
 
 
+def _weekly(row, end):
+    out = []
+    for k in range(12, -1, -1):
+        t = end - k * 7 * DAY
+        pts = [p for p in row.get("history") or [] if p[0] <= t]
+        if pts and t - pts[-1][0] < 7 * DAY:
+            out.append((t, pts[-1][1]))
+    return out
+
+
+def storage_lines(rows, warn_pct, accent, end, w=650, h=280, mono="IBM Plex Mono", warn_color=config.WARN,
+                  ink="#171717", muted="#6b6b6b", grid="rgba(23,23,23,.08)", axis="rgba(23,23,23,.28)", fs=12,
+                  other="#a3a3a3"):
+    """Several storages on one chart (one per node when there's no shared storage): the first row leads in the
+    accent with its projection, the others are grey, each named at its line's end."""
+    series = [(r, _weekly(r, end)) for r in rows]
+    series = [(r, pts) for r, pts in series if len(pts) >= 2]
+    if not series:
+        return ""
+    if len(series) == 1:
+        return storage_chart(series[0][0], warn_pct, accent, end, w, h, mono, warn_color, ink, muted, grid, axis, fs)
+    lead, lead_pts = series[0]
+    t0 = min(p[0][0] for _, p in series)
+    last = max(p[-1][0] for _, p in series)
+    t1 = last + 2 * 7 * DAY
+    vals = [v for _, pts in series for _, v in pts]
+    lo = max(0, int((min(vals) - 8) // 10 * 10))
+    hi = min(100, max(int((max(vals) + 12) // 10 * 10), lo + 20))
+    if max(vals) >= warn_pct - 15:
+        hi = max(hi, min(100, warn_pct + 10))
+    label_w = int(max(len(r["node"] or r["name"]) for r, _ in series) * fs * 0.62) + 48
+    left, right, top, bottom = 40, w - label_w, 24, h - 40
+
+    def x(t):
+        return left + (t - t0) / (t1 - t0) * (right - left)
+
+    def y(v):
+        return bottom - (v - lo) / (hi - lo) * (bottom - top)
+
+    out = [f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="Storage used per node, last 12 '
+           f'weeks" style="display:block">', f'<g font-family="{mono}, monospace" font-size="{fs}" fill="{muted}">']
+    for v in range(lo, hi + 1, 10):
+        stroke = warn_color if v == warn_pct else axis if v == lo else grid
+        dash = ' stroke-dasharray="4 4"' if v == warn_pct else ""
+        out.append(f'<line x1="{left}" x2="{right}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="{stroke}"{dash}/>')
+        out.append(f'<text x="0" y="{y(v) + 4:.1f}">{v}</text>')
+    # grey lines first, the lead on top
+    labels = []
+    for i, (r, pts) in reversed(list(enumerate(series))):
+        color = accent if i == 0 else other
+        path = " ".join(f"{'M' if k == 0 else 'L'}{x(t):.1f} {y(v):.1f}" for k, (t, v) in enumerate(pts))
+        out.append(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{2 if i == 0 else 1.5}" stroke-linejoin="round"/>')
+        out.append(f'<circle cx="{x(pts[-1][0]):.1f}" cy="{y(pts[-1][1]):.1f}" r="{4 if i == 0 else 3}" fill="{color}"/>')
+        labels.append([y(pts[-1][1]) + 4, f"{pts[-1][1]:.0f}% {escape(r['node'] or r['name'])}", i])
+    # keep end labels from overlapping: at least one line of text apart
+    labels.sort()
+    for k in range(1, len(labels)):
+        labels[k][0] = max(labels[k][0], labels[k - 1][0] + fs + 2)
+    for ly, text, i in labels:
+        out.append(f'<text x="{right + 10}" y="{ly:.1f}"{" fill=" + chr(34) + ink + chr(34) if i == 0 else ""}>{text}</text>')
+    for t in (t0, lead_pts[len(lead_pts) // 2][0], last):
+        label = "this week" if t == last else dt.datetime.fromtimestamp(t, config.TZ).strftime("%-d %b")
+        out.append(f'<text x="{min(x(t) - (12 if t == last else 0), right - len(label) * fs * 0.62):.1f}" y="{h - 12}">{label}</text>')
+    out.append("</g></svg>")
+    return "".join(out)
+
+
 def heatmap(rows, accent, w=534, cell_h=20, gap=1, empty="#eeeeee"):
     """One SVG row per heat row: cells shaded by value 0..100, missing cells light grey."""
     out = []

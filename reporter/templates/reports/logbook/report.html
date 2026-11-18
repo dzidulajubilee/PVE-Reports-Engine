@@ -97,7 +97,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
   <div class="hdr">
     <div>
       <p class="kicker">{{ kicker }}</p>
-      <h1>Cluster report, {{ week_word }}</h1>
+      <h1>{{ noun }} report, {{ week_word }}</h1>
     </div>
     <div style="text-align:right">
       {% if logo %}<img class="logo" src="{{ logo }}" alt="" style="margin-bottom:8px"><br>{% endif %}
@@ -127,7 +127,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 
   {% set tl = v.timeline %}
   <section class="week keep">
-    <div class="top"><h2 class="head">The {{ period_word }}</h2><p class="key">bar = node up, as recorded{% if tl.any_norec %} · dashes = not recorded{% endif %} · lights = backups</p></div>
+    <div class="top"><h2 class="head">The {{ period_word }}</h2><p class="key">bar = running (recorded or uptime){% if tl.any_norec %} · dashes = not recorded{% endif %} · lights = backups</p></div>
     <div class="days"><span class="ln"></span><div class="area">
       {% for dl in tl.days %}{% set left = 100 * loop.index0 / tl.n %}
       <span class="vline" style="left:{{ left }}%"></span>{% if tl.wide or tl.n <= 16 or loop.index0 % 5 == 0 %}<span class="dl" style="left:{{ left }}%">{{ dl }}</span>{% endif %}

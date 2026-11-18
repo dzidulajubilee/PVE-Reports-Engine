@@ -25,7 +25,7 @@
   <p class="lede">{{ v.capacity_line }}</p>
   {% if chart and v.main %}
   <section class="keep chart">
-    <p class="figcap"><span>{{ nm(v.main.label) }} used, last 12 weeks{% if v.main.eta_warn %} and where it is heading{% endif %}</span><span class="mono">% used</span></p>
+    <p class="figcap"><span>{% if v.chart_rows|length > 1 %}{{ v.chart_caption }}{% else %}{{ nm(v.main.label) }} used, last 12 weeks{% if v.main.eta_warn %} and where it is heading{% endif %}{% endif %}</span><span class="mono">% used</span></p>
     {{ chart|safe }}
   </section>
   {% endif %}

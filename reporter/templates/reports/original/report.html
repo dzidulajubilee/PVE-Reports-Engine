@@ -96,7 +96,7 @@ h1 { font-size: 30px; line-height: 1.15; font-weight: 500; }
   <div class="hdr">
     <div>
       <p class="org">{{ kicker }}</p>
-      <h1>{{ kind|capitalize if kind != "custom" else "" }}{{ " cluster report, " if kind != "custom" else "Cluster report, " }}{{ week_word }}</h1>
+      <h1>{{ kind|capitalize if kind != "custom" else "" }}{{ " " ~ noun|lower ~ " report, " if kind != "custom" else noun ~ " report, " }}{{ week_word }}</h1>
     </div>
     {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
   </div>
