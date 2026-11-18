@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fix: reading node journals failed with "utf-8 codec can't decode byte 0x8b" because Proxmox gzips them. API
+  answers are now unpacked, and asked for gzipped, which is faster on slow links.
+- README: a Proxmox permissions section with commands, web-interface steps and common mistakes.
+
 - Backups: the latest backup of each guest now comes from the backup task logs (and the backup server when set
   up), because Proxmox lists backup files only to tokens that may make backups. No more "never" for guests
   that are backed up.

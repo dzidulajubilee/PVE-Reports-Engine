@@ -9,6 +9,7 @@
   failed call never stops a report.
 """
 
+import gzip
 import hashlib
 import http.client
 import json
@@ -94,9 +95,11 @@ class Client:
                         "not the one saved in Settings",
                         path=path,
                     )
-            conn.request("GET", path, headers={"Authorization": self.auth, "Accept": "application/json"})
+            # gzip saves time on slow links; Proxmox compresses some answers (the journal) either way
+            conn.request("GET", path, headers={"Authorization": self.auth, "Accept": "application/json",
+                                               "Accept-Encoding": "gzip"})
             r = conn.getresponse()
-            body = r.read()
+            body = unpack(r.read(), r.getheader("Content-Encoding"))
             if r.status != 200:
                 reason = r.reason
                 try:
@@ -132,6 +135,13 @@ class Client:
             except (OSError, socket.timeout, ssl.SSLError, http.client.HTTPException) as e:
                 last = e
         raise ApiError(describe(last), path=path)
+
+
+def unpack(body, encoding=None):
+    """The answer's bytes, gunzipped when the server compressed them (by header, or by the gzip magic bytes)."""
+    if (encoding or "").lower() == "gzip" or body[:2] == b"\x1f\x8b":
+        return gzip.decompress(body)
+    return body
 
 
 def describe(e):

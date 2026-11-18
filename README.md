@@ -18,7 +18,7 @@ an account can make one for any dates in the web portal.
 
 You need a Linux host with Docker and the Compose plugin that can reach the Proxmox nodes on port 8006.
 
-1. On a Proxmox node, make a read-only token: three commands in [docs/proxmox-setup.md](docs/proxmox-setup.md).
+1. On a Proxmox node, make a read-only role, user and token: see [Proxmox permissions](#proxmox-permissions) below.
 2. On the Docker host:
    ```sh
    git clone https://github.com/dzidulajubilee/PVE-Reports-Engine.git
@@ -44,6 +44,60 @@ Updating: `git pull && ./install.sh` (your settings stay in `reporter/out` and `
 Copy `reporter/.env.example` to `reporter/.env` and fill it in, put a certificate in `nginx/certs/server.crt` and
 `server.key`, then `docker compose up -d --build`. With no accounts yet, the portal shows a setup page that asks for
 a one-time code; the container logs it: `docker compose logs reporter | grep "setup code"`.
+
+## Proxmox permissions
+
+The reporter only reads. It needs one API token with a read-only role. Most setup problems come from the steps
+below, so follow them exactly.
+
+**The rule that catches people out:** a token made with *privilege separation* (the default, and the safe choice)
+only gets the rights that **both** the user **and** the token have. Give the role twice, once to the user and once
+to the token, both on path `/`.
+
+### With commands (on any node, as root)
+
+```sh
+# 1. A read-only role: PVEAuditor plus Sys.Syslog (to read logs). On Proxmox VE 8, leave out VM.GuestAgent.Audit
+pveum role add ReportReader --privs "Sys.Audit Sys.Syslog VM.Audit Datastore.Audit Pool.Audit SDN.Audit Mapping.Audit VM.GuestAgent.Audit"
+
+# 2. A user for the reporter, given the role on /
+pveum user add reporter@pve --comment "Cluster reports (read-only)"
+pveum acl modify / --users reporter@pve --roles ReportReader
+
+# 3. A token for that user (prints the secret once: copy it), given the same role on /
+pveum user token add reporter@pve reports --privsep 1
+pveum acl modify / --tokens 'reporter@pve!reports' --roles ReportReader
+
+# 4. Check: the list must include Sys.Audit, Sys.Syslog, VM.Audit and Datastore.Audit
+pveum user token permissions reporter@pve reports --path /
+```
+
+### Or in the web interface
+
+| Step | Where | What to fill in |
+|---|---|---|
+| 1. Role | Datacenter → Permissions → Roles → **Create** | Name `ReportReader`; tick Sys.Audit, Sys.Syslog, VM.Audit, Datastore.Audit, Pool.Audit, SDN.Audit, Mapping.Audit, VM.GuestAgent.Audit (PVE 9) |
+| 2. User | Datacenter → Permissions → Users → **Add** | User name `reporter`, Realm `Proxmox VE authentication server` (pve). No password needed |
+| 3. User's permission | Datacenter → Permissions → **Add → User Permission** | Path `/`, User `reporter@pve`, Role `ReportReader`, Propagate ticked |
+| 4. Token | Datacenter → Permissions → API Tokens → **Add** | User `reporter@pve`, Token ID `reports` (just the name, no `!`), Privilege Separation ticked. Copy the secret now: it's shown once |
+| 5. Token's permission | Datacenter → Permissions → **Add → API Token Permission** | Path `/`, API Token `reporter@pve!reports`, Role `ReportReader`, Propagate ticked |
+
+In the installer and in Settings, the token ID is the full form `reporter@pve!reports`, and the secret is the UUID
+from step 4.
+
+### Common mistakes
+
+| What you see | Cause | Fix |
+|---|---|---|
+| `403 Permission check failed (/, Sys.Audit)` | The role is on the token but not the user, or the other way round | Do both step 3 and step 5 |
+| `403 … (/nodes/<node>, Sys.Syslog)`; Errors in the logs is empty; Read past logs fails | The role is PVEAuditor, which can't read logs | Use ReportReader (step 1) on both user and token |
+| Some sections empty, no error | The permission is on a path other than `/`, or Propagate is off | Path `/`, Propagate ticked |
+| `401 … token was rejected` | Wrong token ID or secret | Token ID `user@realm!name`; make a new token if the secret is lost |
+| PVESysAdmin or Administrator given "to be safe" | These can change the cluster, and PVESysAdmin still lacks VM.Audit and Datastore.Audit | Use ReportReader only |
+
+The reporter never needs write rights. It doesn't list pending updates (that needs `Sys.Modify`); it reports nodes
+that need a reboot for an installed kernel instead. For certificates and the optional Proxmox Backup Server token,
+see [docs/proxmox-setup.md](docs/proxmox-setup.md).
 
 ## Accounts
 

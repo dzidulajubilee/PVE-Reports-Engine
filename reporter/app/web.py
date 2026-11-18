@@ -685,6 +685,7 @@ def _run_backfill(days, by):
         R.db.set_state("backfill", json.dumps(st))
 
     try:
+        R.db.set_state("backfill", json.dumps({}))  # forget the previous run's error
         save(status="running", days=days, step=0, steps=1, started=time.time(), by=by, problems=[])
         kept, problems = snapshot.backfill(pve_client(R.load_settings()), days, lambda a, b: save(step=a, steps=b))
         save(status="done", kept=kept, problems=problems[:5], finished=time.time())

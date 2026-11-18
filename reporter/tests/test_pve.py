@@ -64,3 +64,12 @@ def test_source_counts_failures_and_permission_refusals():
 def test_missing_permission_is_named():
     why = pve.describe(pve.ApiError("403 Permission check failed (/, Sys.Audit)", status=403))
     assert "Sys.Audit on /" in why and "both the user and the token" in why
+
+
+def test_gzipped_answers_are_unpacked():
+    import gzip
+
+    body = gzip.compress(b'{"data": ["cursor", "Nov 18 03:12:01 pve-a corosync[1]: link down"]}')
+    assert pve.unpack(body, "gzip").startswith(b'{"data"')
+    assert pve.unpack(body, None).startswith(b'{"data"')  # compressed without saying so
+    assert pve.unpack(b'{"data": 1}', None) == b'{"data": 1}'
