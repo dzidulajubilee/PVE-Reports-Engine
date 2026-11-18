@@ -604,11 +604,10 @@ def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, 
     for r in ok:
         seen_ok(r["vmid"], r["t"], r["size"])
     if S.pbs:
-        for ds in S.pbs_get("/admin/datastore") or []:
-            for grp in S.pbs_get(f"/admin/datastore/{ds.get('store')}/groups") or []:
-                bid = str(grp.get("backup-id", ""))
-                if grp.get("backup-type") in ("vm", "ct") and bid.isdigit() and grp.get("last-backup"):
-                    seen_ok(int(bid), int(grp["last-backup"]))
+        for grp in pbs_groups(S):
+            bid = str(grp.get("backup-id", ""))
+            if grp.get("backup-type") in ("vm", "ct") and bid.isdigit() and grp.get("last-backup"):
+                seen_ok(int(bid), int(grp["last-backup"]))
     wanted = {g["vmid"] for g in guests_res} - set(latest)
     if wanted and online_nodes:
         # look back a month before the period for guests not backed up inside it, newest runs first
@@ -984,6 +983,18 @@ def collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now
     return [{"key": k, "what": w, "state": s, "tone": t} for k, w, s, t in h]
 
 
+def pbs_groups(S):
+    """Every backup group on the backup server, in every datastore and namespace (Proxmox VE often writes into a
+    namespace such as Production, which a root-only listing misses)."""
+    out = []
+    for ds in S.pbs_get("/admin/datastore") or []:
+        store = ds.get("store")
+        spaces = [n.get("ns", "") for n in S.pbs_get(f"/admin/datastore/{store}/namespace") or []] or [""]
+        for ns in spaces:
+            out += S.pbs_get(f"/admin/datastore/{store}/groups", ns=ns or None) or []
+    return out
+
+
 def collect_pbs(S, s_, e_):
     usage = S.pbs_get("/status/datastore-usage")
     stores = []
@@ -1011,6 +1022,8 @@ def collect_pbs(S, s_, e_):
             failed.append({"t": t.get("starttime"), "type": k, "what": t.get("worker_id"), "reason": t.get("status")})
     if usage is None and tasks is None:
         return {"error": True, "stores": [], "kinds": {}, "failed": []}
+    if not usage and not tasks:  # answered, but shows nothing: the token lacks the Audit role
+        return {"error": True, "denied": True, "stores": [], "kinds": {}, "failed": []}
     return {"error": False, "stores": stores, "kinds": dict(kinds), "failed": failed[:20]}
 
 

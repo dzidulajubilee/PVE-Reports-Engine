@@ -96,8 +96,9 @@ from step 4.
 | PVESysAdmin or Administrator given "to be safe" | These can change the cluster, and PVESysAdmin still lacks VM.Audit and Datastore.Audit | Use ReportReader only |
 
 The reporter never needs write rights. It doesn't list pending updates (that needs `Sys.Modify`); it reports nodes
-that need a reboot for an installed kernel instead. For certificates and the optional Proxmox Backup Server token,
-see [docs/proxmox-setup.md](docs/proxmox-setup.md).
+that need a reboot for an installed kernel instead. For certificates and the optional Proxmox Backup Server token
+(the same rule applies there: Audit on `/` for both the user and the token), see
+[docs/proxmox-setup.md](docs/proxmox-setup.md#3-proxmox-backup-server-optional).
 
 ## Accounts
 

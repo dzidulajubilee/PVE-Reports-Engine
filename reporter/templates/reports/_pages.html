@@ -180,7 +180,7 @@
   {% if "pbs" in on and v.pbs %}
   <section class="keep">
     {{ ptitle(16, "Backup server", "h3", "h3") }}
-    {% if v.pbs.error %}<p class="note">The Proxmox Backup Server couldn't be read</p>{% else %}
+    {% if v.pbs.error %}<p class="note">{% if v.pbs.denied %}The backup server answered but shows no datastores: its token needs the Audit role on / for both the user and the token{% else %}The Proxmox Backup Server couldn't be read{% endif %}</p>{% else %}
     <table class="t">
       <thead><tr><th>Datastore</th><th>Used</th><th class="r">Size</th><th class="r">Full by</th></tr></thead>
       <tbody>{% for s in v.pbs.stores %}<tr><td>{{ nm(s.name) }}</td><td class="nowrap">{{ bar(s.pct) }}{{ s.pct_text }}</td><td class="r mono small">{{ s.size_text }}</td><td class="r">{{ s.full_text }}</td></tr>{% endfor %}</tbody>

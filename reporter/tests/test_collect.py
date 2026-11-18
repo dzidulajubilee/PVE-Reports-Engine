@@ -124,3 +124,20 @@ def test_logged_quorum_events_are_facts_outside_recordings():
     ev = logged_events(t0, t0 + 86400)
     assert [e["kind"] for e in ev] == ["lost", "back", "lost"] and ev[0]["nodes"] == ["pve-a", "pve-b"]
     assert [e["kind"] for e in logged_events(t0, t0 + 86400, recorded=[(t0 + 4000, t0 + 6000)])] == ["lost", "back"]
+
+
+def test_pbs_groups_cover_every_namespace():
+    from app.collect import pbs_groups
+
+    class S:
+        def pbs_get(self, path, **kw):
+            if path == "/admin/datastore":
+                return [{"store": "main"}]
+            if path.endswith("/namespace"):
+                return [{"ns": ""}, {"ns": "Production"}]
+            if path.endswith("/groups"):
+                return [{"backup-type": "vm", "backup-id": "100" if kw.get("ns") == "Production" else "200",
+                         "last-backup": 1}]
+            raise AssertionError(path)
+
+    assert sorted(g["backup-id"] for g in pbs_groups(S())) == ["100", "200"]

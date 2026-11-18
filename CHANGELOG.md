@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Backup server: backups in namespaces (such as Production) are found; the fingerprint Proxmox VE already
+  trusts for the backup server is filled in automatically; a token that sees no datastore is reported as a
+  missing permission; the certificate error no longer points to the Proxmox VE CA file.
+- Setup guide: the backup server token needs Audit for both the user and the token.
+
 - Availability shows only recorded facts. Without recordings there is no percentage; quorum losses and fencing
   that the nodes logged are shown with their time and node, and "no quorum loss logged" when the logs cover
   the period. The timeline draws node-up bars only for recorded time; unrecorded time is dashed.

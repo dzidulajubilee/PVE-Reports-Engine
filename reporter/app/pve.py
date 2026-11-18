@@ -133,8 +133,11 @@ class Client:
                     raise
                 last = e
             except (OSError, socket.timeout, ssl.SSLError, http.client.HTTPException) as e:
+                if isinstance(e, ssl.SSLCertVerificationError):
+                    e.product = self.product
                 last = e
-        raise ApiError(describe(last), path=path)
+        err = ApiError(describe(last), path=path)
+        raise err
 
 
 def unpack(body, encoding=None):
@@ -149,6 +152,9 @@ def describe(e):
     if e is None:
         return "no address answered"
     if isinstance(e, ssl.SSLCertVerificationError):
+        if getattr(e, "product", "pve") == "pbs":
+            return ("the backup server's certificate couldn't be checked: give its fingerprint (PBS dashboard → Show "
+                    "Fingerprint) and leave the CA empty, as PBS signs its own certificate")
         return ("the certificate couldn't be checked: paste the cluster CA (/etc/pve/pve-root-ca.pem) or the "
                 "certificate fingerprint in Settings")
     if isinstance(e, ApiError):
@@ -194,7 +200,9 @@ def test(settings, product="pve"):
             c.get("/cluster/resources", type="node")
         else:
             c.get("/version")
-            c.get("/admin/datastore")
+            if not c.get("/admin/datastore"):
+                return ("connected, but the token sees no datastore. Give the Audit role on / to both the user and "
+                        "the token (see docs/proxmox-setup.md)")
         return None
     except Exception as e:  # noqa: BLE001
         return describe(e)

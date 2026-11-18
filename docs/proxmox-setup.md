@@ -38,14 +38,26 @@ Certificate checking can't be switched off.
 
 ## 3. Proxmox Backup Server (optional)
 
+On the backup server, as root:
+
 ```sh
 proxmox-backup-manager user create reporter@pbs
-proxmox-backup-manager user generate-token reporter@pbs reports
+proxmox-backup-manager user generate-token reporter@pbs reports      # prints the secret once: copy it
+# like Proxmox VE, a token gets only what both it and its user have: give Audit to both, on /
+proxmox-backup-manager acl update / Audit --auth-id reporter@pbs
 proxmox-backup-manager acl update / Audit --auth-id 'reporter@pbs!reports'
 ```
 
+In the PBS web interface: Configuration → Access Control → User Management (add `reporter`, realm pbs), API Token
+(add `reports` for it), then Permissions → Add twice, User Permission and API Token Permission, both Path `/`, Role
+`Audit`, Propagate ticked.
+
 Then in Settings → Proxmox Backup Server: tick Include, give the address (https://pbs.example.lan:8007), the token
-and its secret, and the fingerprint shown on the PBS dashboard (Show Fingerprint).
+ID `reporter@pbs!reports` and its secret. Leave the CA empty: PBS signs its own certificate. When your cluster
+already uses this backup server as storage, the fingerprint it trusts is filled in for you; otherwise copy it from
+the PBS dashboard (Show Fingerprint).
+
+Backups written into a namespace (for example Production) are found too.
 
 ## What the reporter reads
 

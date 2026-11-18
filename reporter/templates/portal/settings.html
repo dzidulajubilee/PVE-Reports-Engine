@@ -94,9 +94,9 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
         <div class="field"><label for="pbs_token_id">Token ID</label><input type="text" id="pbs_token_id" name="pbs_token_id" value="{{ s.pbs.token_id }}" placeholder="reporter@pbs!reports" autocomplete="off"></div>
         <div class="field"><label for="pbs_token_secret">Token secret</label><input type="password" id="pbs_token_secret" name="pbs_token_secret" autocomplete="new-password" placeholder="{{ 'Saved, leave blank to keep' if has_pbs_secret else '' }}"></div>
       </div>
-      <div class="field"><label for="pbs_ca_pem">CA certificate</label><textarea id="pbs_ca_pem" name="pbs_ca_pem" placeholder="-----BEGIN CERTIFICATE-----">{{ s.pbs.ca_pem }}</textarea></div>
+      <div class="field"><label for="pbs_ca_pem">CA certificate <span class="muted">(usually empty: PBS signs its own certificate)</span></label><textarea id="pbs_ca_pem" name="pbs_ca_pem" placeholder="-----BEGIN CERTIFICATE-----">{{ s.pbs.ca_pem }}</textarea></div>
       <div class="field"><label for="pbs_fingerprint">Or certificate fingerprint (SHA-256)</label><input type="text" id="pbs_fingerprint" name="pbs_fingerprint" value="{{ s.pbs.fingerprint }}" class="mono">
-        <div class="hint">Shown on the PBS dashboard under Show Fingerprint</div></div>
+        <div class="hint">Shown on the PBS dashboard under Show Fingerprint. Leave empty when Proxmox VE already uses this backup server: its trusted fingerprint is filled in for you</div></div>
       <div class="test-row"><button type="button" class="btn quiet small" data-test="pbs">Test connection</button><span class="result" id="pbs-result"></span></div>
     </div>
   </section>

@@ -615,6 +615,24 @@ def _fp(text):
     return ", ".join(fps), None
 
 
+def trusted_pbs_fingerprint(s, url):
+    """The fingerprint Proxmox VE itself trusts for this backup server (from its PBS storage), or None."""
+    from urllib.parse import urlsplit
+
+    from .pve import pve_client
+
+    host = urlsplit(url).hostname if url else None
+    if not host or not s["pve"]["hosts"]:
+        return None
+    try:
+        for st in pve_client(s).get("/storage") or []:
+            if st.get("type") == "pbs" and st.get("server") == host and st.get("fingerprint"):
+                return st["fingerprint"]
+    except Exception:  # noqa: BLE001 - only a convenience
+        return None
+    return None
+
+
 def connection_from(form, saved, prefix):
     """The Proxmox or PBS block of the Settings form; a blank secret keeps the saved one. (block, problem)."""
     out = dict(saved)
@@ -657,6 +675,8 @@ def settings_test(product):
         return jsonify(ok=False, message=why)
     if product == "pbs":
         block["enabled"] = True
+        if not block["fingerprint"]:  # a fingerprint wins over a CA, so the one the cluster trusts settles it
+            block["fingerprint"] = trusted_pbs_fingerprint(s, block["url"]) or ""
     s[product] = block
     why = test_connection(s, product)
     return jsonify(ok=not why, message=("Connected" if not why else why[0].upper() + why[1:]))
@@ -743,6 +763,11 @@ def settings():
             return redirect(url_for("settings"))
         pve, why = connection_from(f, s["pve"], "pve")
         pbs, why2 = connection_from(f, s["pbs"], "pbs")
+        if pbs and pbs.get("enabled") and not pbs["fingerprint"]:
+            fp = trusted_pbs_fingerprint(s, pbs["url"])
+            if fp:
+                pbs["fingerprint"] = fp
+                flash("Using the backup server fingerprint your Proxmox VE cluster already trusts")
         if why or why2:
             flash(why or why2)
             return redirect(url_for("settings"))
