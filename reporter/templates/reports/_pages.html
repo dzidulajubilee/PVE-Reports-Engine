@@ -202,7 +202,7 @@
   {% if "logs" in on and v.logs %}
   <section class="{{ 'flow' if v.logs|length > 8 else 'keep' }}">
     {{ ptitle(18, "Errors in the logs", "h3", "h3") }}
-    <p class="sub">Warnings and errors from node journals and the cluster log, the same message counted once</p>
+    <p class="sub">Warnings and errors from node journals and the cluster log, the same message counted once{% if d.logs_from %}. Logs start {{ v.logs_from_text }}{% endif %}</p>
     <table class="t">
       <tbody>{% for l in v.logs %}<tr><td class="mono small muted nowrap when">{{ l.when }}</td><td class="mono small nowrap">{{ l.node }} {{ l.unit }}</td><td class="{{ 't-bad' if l.level == 'error' }} small">{{ l.message[:110] }}{% if l.count > 1 %} <span class="muted">×{{ l.count }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
     </table>

@@ -119,6 +119,19 @@ if docker compose exec -T reporter python report.py user list 2> /dev/null | gre
   docker compose exec reporter python report.py user add "$admin" --role admin
 fi
 
+# past logs: the reporter keeps logs from now on; reading back gives the first reports the weeks before
+if [ "$FRESH" = 1 ] && [ -n "$(get_env PVE_HOSTS)" ]; then
+  printf '\n  Past logs\n'
+  note "Backups, load and storage history come from Proxmox itself. Node journals and the cluster log are kept"
+  note "from now on; the reporter can also read back what the nodes still have."
+  days=$(ask 'Days of past logs to read now (0 to skip; 7 to 92)' '30')
+  if [[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ]; then
+    [ "$days" -gt 92 ] && days=92
+    docker compose exec reporter python report.py logs backfill --days "$days" \
+      || warn "Reading past logs didn't finish. Run it later from Settings → Past logs."
+  fi
+fi
+
 suffix=""; [ "$port" = 443 ] || suffix=":$port"
 printf '\n  Done. Open https://%s%s and sign in.\n' "$(hostname -I 2> /dev/null | awk '{print $1}')" "$suffix"
 note "The first report covers only what Proxmox keeps; uptime and restart history fill in from now on."

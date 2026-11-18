@@ -28,6 +28,8 @@ You need a Linux host with Docker and the Compose plugin that can reach the Prox
    The installer asks for a name, time zone, node addresses and the token, reads each node's certificate
    fingerprint for you to confirm, makes an HTTPS certificate for the portal, builds and starts the containers, and
    creates the first admin account.
+   At the end it offers to read back past logs (30 days by default) so your first reports already show errors
+   from before the install.
 3. Open `https://<docker-host>`, sign in, and check **Settings**: email server, recipients, schedule and look.
 4. Press **Make report** for last week to see it straight away.
 
@@ -69,6 +71,7 @@ docker compose exec reporter python report.py user list
 docker compose exec reporter python report.py run weekly              # last week, emailed to its recipients
 docker compose exec reporter python report.py run monthly --no-email
 docker compose exec reporter python report.py run custom --start 2026-11-01 --end 2026-11-15
+docker compose exec reporter python report.py logs backfill --days 30   # read past logs (also in Settings)
 ```
 
 ## How it works
@@ -77,6 +80,10 @@ One small container runs the portal, a report worker, the scheduler, and a snaps
 cluster every 5 minutes into SQLite (`reporter/out/reporter.db`). Proxmox keeps only averages, so the snapshots are
 what give accurate outages, restarts and quorum history. The first reports after install say how much of the period
 they cover.
+
+On first install, or any time from Settings → Past logs, the reporter can read back node journals and the cluster
+log, as far back as each node still keeps them. Backups, migrations and load/storage history never need this:
+Proxmox keeps those itself. Outages, guest restarts and quorum history can't be read back and start at install.
 
 Reports are HTML templates (`reporter/templates/reports/<look>/report.html`) laid out by WeasyPrint. After layout
 each PDF is checked for near-empty pages, stranded headings and content past the page edge, and laid out again with

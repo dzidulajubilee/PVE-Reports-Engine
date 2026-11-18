@@ -72,3 +72,28 @@ def test_restarts_and_coverage_from_snapshots():
     g = snap_guests(t0, t0 + 3600)
     assert len(g[130]["restarts"]) == 1
     assert 0.99 <= snapshot_coverage(t0, t0 + 3600) <= 1.0
+
+
+def test_backfill_reads_past_journals_once():
+    from app import snapshot
+
+    now = int(dt.datetime(2026, 3, 20, 12, tzinfo=TZ).timestamp())
+
+    class Api:
+        def get(self, path, **kw):
+            if path == "/cluster/status":
+                return [{"type": "node", "name": "pve-a", "online": 1}]
+            if path == "/cluster/log":
+                return [{"time": now - 3 * 86400, "node": "pve-a", "pri": 3, "tag": "pve-ha-crm", "msg": "fencing node"},
+                        {"time": now - 90 * 86400, "node": "pve-a", "pri": 3, "tag": "x", "msg": "too old"}]
+            if path.endswith("/journal"):
+                day = dt.datetime.fromtimestamp(kw["since"], TZ)
+                return ["cursor-a", f"{day:%b %d} 03:12:01 pve-a corosync[812]: [KNET] link: host: 2 link: 0 is down",
+                        f"{day:%b %d} 03:12:02 pve-a sshd[1]: accepted login", "cursor-b"]
+            raise AssertionError(path)
+
+    kept, problems = snapshot.backfill(Api(), 7, now=now)
+    assert kept == 8 and problems == []  # 7 corosync lines and one cluster log entry; sshd and the old entry dropped
+    again, _ = snapshot.backfill(Api(), 7, now=now)
+    assert again == 0
+    assert int(db.get_state("logs_from")) <= now - 6 * 86400

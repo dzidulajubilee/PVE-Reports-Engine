@@ -418,6 +418,8 @@ def collect(S, start, end, settings, full=True, now=None):
     d["health"] = collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now)
     d["logs"], d["log_lines"] = logs_between(s_, e_)
     d["logs_collected"] = db.one("select count(*) as n from logs")["n"] > 0
+    lf = db.get_state("logs_from")
+    d["logs_from"] = int(lf) if lf and int(lf) > s_ else None  # logs start inside the period
     d["failed_tasks"] = [
         {"t": x.get("starttime"), "node": x.get("node"), "type": x.get("type"), "id": x.get("id"),
          "user": x.get("user"), "status": x.get("status")}

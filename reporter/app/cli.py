@@ -4,6 +4,7 @@
     python report.py user add NAME [--role admin|operator|viewer]
     python report.py user reset-password NAME
     python report.py user list
+    python report.py logs backfill [--days 30]
 
 Passwords are always asked for interactively and never taken as an argument.
 """
@@ -93,6 +94,26 @@ def user_cmd(a):
         print(f"Password changed for {u['username']}; their other sessions have ended")
 
 
+def logs_cmd(a):
+    from . import snapshot
+    from .pve import ApiError, pve_client
+
+    try:
+        client = pve_client(load_settings())
+    except ApiError as e:
+        raise SystemExit(f"The Proxmox connection isn't set up yet: {e}") from e
+    print(f"Reading the last {a.days} days of logs from the cluster. This can take a few minutes")
+
+    def progress(step, steps):
+        print(f"\r  {100 * step // steps:3d}%", end="", flush=True)
+
+    kept, problems = snapshot.backfill(client, a.days, progress)
+    print(f"\nKept {kept} warning and error lines")
+    for p in problems:
+        print(f"  {p}")
+    notify(f"Past logs read from the command line: {kept} lines from the last {a.days} days", admins_only=True)
+
+
 def main():
     load_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
@@ -107,9 +128,14 @@ def main():
     u.add_argument("action", choices=["add", "reset-password", "list"])
     u.add_argument("name", nargs="?")
     u.add_argument("--role", choices=list(users.ROLES), default="admin")
+    lg = sub.add_parser("logs", help="read past logs from the cluster")
+    lg.add_argument("action", choices=["backfill"])
+    lg.add_argument("--days", type=int, default=30, choices=range(1, 366), metavar="DAYS")
     a = ap.parse_args()
     if a.cmd == "user":
         return user_cmd(a)
+    if a.cmd == "logs":
+        return logs_cmd(a)
 
     def day(x):
         return dt.datetime.combine(dt.date.fromisoformat(x), dt.time(), config.TZ)

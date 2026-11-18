@@ -13,12 +13,13 @@ from .config import load_settings, log
 from .pve import pve_client
 
 INTERVAL = 300
+DAY = 86400
 
 # journal lines kept: warnings and errors from the services that matter for a cluster
 JOURNAL_UNITS = re.compile(r"^(pve[\w-]*|corosync|ceph[\w-]*|zfs[\w-]*|zed|kernel|qmeventd|lxc[\w-]*|watchdog-mux|"
                            r"pmxcfs|spiceproxy|proxmox-[\w-]*|smartd)$")
 BAD_WORDS = re.compile(r"\b(error|failed|failure|fail|fence|fencing|degraded|unable|timeout|timed out|crit|"
-                       r"critical|panic|i/o error|segfault|out of memory|oom|link down|lost|retransmit)\b", re.I)
+                       r"critical|panic|i/o error|segfault|out of memory|oom|link down|is down|went down|lost|retransmit|not quorate|members left)\b", re.I)
 JOURNAL_LINE = re.compile(r"^(?P<ts>\w{3} +\d+ [\d:]+) (?P<host>\S+) (?P<unit>[\w.@-]+?)(?:\[\d+\])?: (?P<msg>.*)$")
 
 
@@ -65,20 +66,42 @@ def take(client, now=None):
     return rows
 
 
+def _store_cluster_log(entries, now, since=0):
+    added = 0
+    with db.tx() as c:
+        for e in entries or []:
+            t = int(e.get("time", now))
+            if t < since:
+                continue
+            pri = int(e.get("pri", 6))
+            level = "error" if pri <= 3 else "warning" if pri == 4 else "info"
+            cur = c.execute("insert or ignore into logs values (?, 'cluster', ?, ?, ?, ?)",
+                            (t, e.get("node", ""), level, e.get("tag", ""), str(e.get("msg", ""))[:500]))
+            added += cur.rowcount
+    return added
+
+
+def _store_journal(node, lines, now):
+    """Keep warnings and errors from the services that matter; the same line twice is stored once."""
+    added = 0
+    with db.tx() as c:
+        for line in lines:
+            m = JOURNAL_LINE.match(line or "")
+            if not m:
+                continue  # cursor lines and anything that isn't a log line
+            unit = m["unit"].split("@")[0]
+            if not JOURNAL_UNITS.match(unit) or not BAD_WORDS.search(m["msg"]):
+                continue
+            level = "error" if re.search(r"error|fail|panic|fenc|oom|out of memory|crit", m["msg"], re.I) else "warning"
+            cur = c.execute("insert or ignore into logs values (?, 'journal', ?, ?, ?, ?)",
+                            (_journal_time(m["ts"], now), node, level, unit, m["msg"][:500]))
+            added += cur.rowcount
+    return added
+
+
 def read_logs(client, nodes, now):
     """New cluster log entries and new journal lines since the saved cursor, deduplicated."""
-    added = 0
-    entries = client.get("/cluster/log", max=500)
-    if entries:
-        with db.tx() as c:
-            for e in entries:
-                pri = int(e.get("pri", 6))
-                level = "error" if pri <= 3 else "warning" if pri == 4 else "info"
-                cur = c.execute(
-                    "insert or ignore into logs values (?, 'cluster', ?, ?, ?, ?)",
-                    (int(e.get("time", now)), e.get("node", ""), level, e.get("tag", ""), str(e.get("msg", ""))[:500]),
-                )
-                added += cur.rowcount
+    added = _store_cluster_log(client.get("/cluster/log", max=500), now)
     for node in nodes:
         key = f"journal_cursor:{node}"
         cursor = db.get_state(key)
@@ -93,24 +116,56 @@ def read_logs(client, nodes, now):
         if not lines:
             continue
         # the API returns the start cursor first and the end cursor last
-        end_cursor = lines[-1] if len(lines) > 1 else None
-        with db.tx() as c:
-            for line in lines[1:-1]:
-                m = JOURNAL_LINE.match(line)
-                if not m:
-                    continue
-                unit = m["unit"].split("@")[0]
-                if not JOURNAL_UNITS.match(unit) or not BAD_WORDS.search(m["msg"]):
-                    continue
-                level = "error" if re.search(r"error|fail|panic|fenc|oom|out of memory|crit", m["msg"], re.I) else "warning"
-                cur = c.execute(
-                    "insert or ignore into logs values (?, 'journal', ?, ?, ?, ?)",
-                    (_journal_time(m["ts"], now), node, level, unit, m["msg"][:500]),
-                )
-                added += cur.rowcount
-        if end_cursor:
-            db.set_state(key, end_cursor)
+        added += _store_journal(node, lines[1:-1], now)
+        if len(lines) > 1:
+            db.set_state(key, lines[-1])
+    if db.get_state("logs_from") is None:
+        db.set_state("logs_from", int(now))
     return added
+
+
+def backfill(client, days, progress=None, now=None):
+    """Read past logs once: the node journals day by day as far back as `days` (or as far as journald kept them),
+    and whatever the cluster log still holds. Returns (lines kept, problems). Safe to run again: duplicates are
+    skipped."""
+    now = int(now or time.time())
+    since = now - days * DAY
+    problems, kept = [], 0
+    status = client.get("/cluster/status") or []
+    nodes = [s["name"] for s in status if s.get("type") == "node" and s.get("online")]
+    steps = max(1, len(nodes) * days + 1)
+    step, first = 0, []
+    try:
+        kept += _store_cluster_log(client.get("/cluster/log", max=10000), now, since)
+    except Exception as e:  # noqa: BLE001
+        problems.append(f"cluster log: {e}")
+    step += 1
+    for node in nodes:
+        reached = None
+        for k in range(days):  # a day at a time keeps each answer a manageable size
+            a, b = since + k * DAY, min(since + (k + 1) * DAY, now)
+            try:
+                lines = client.get(f"/nodes/{node}/journal", since=a, until=b)
+                if lines and any(JOURNAL_LINE.match(x or "") for x in lines):
+                    reached = a if reached is None else reached
+                kept += _store_journal(node, lines or [], now)
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{node}: {e}")
+                step += days - k
+                break
+            step += 1
+            if progress:
+                progress(step, steps)
+        if reached:
+            first.append(reached)
+        if reached and reached > since + DAY:
+            problems.append(f"{node} kept logs only from {time.strftime('%d %b', time.localtime(reached))}")
+    # logs now reach back to the latest day every node still had (where the shortest journal starts)
+    start = max(first) if first else None
+    if start:
+        prev = db.get_state("logs_from")
+        db.set_state("logs_from", min(int(prev), start) if prev else start)
+    return kept, problems
 
 
 def _journal_time(ts, now):

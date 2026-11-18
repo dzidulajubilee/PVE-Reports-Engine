@@ -5,6 +5,9 @@
 - The portal now answers on https://server (port 443) by default, and plain http://server redirects to it. Set
   PORTAL_PORT and HTTP_PORT in .env to use other ports.
 - Setup guide: how to fix a 403 Permission check failed.
+- Read past logs: the installer offers to read back node journals and the cluster log (30 days by default), and
+  Settings → Past logs or `report.py logs backfill --days N` does it any time. Reports say where the logs start.
+- Corosync link-down and quorum-loss lines are now kept from the journals.
 
 ## 0.1.0
 

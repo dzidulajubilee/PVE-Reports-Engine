@@ -662,6 +662,66 @@ def settings_test(product):
     return jsonify(ok=not why, message=("Connected" if not why else why[0].upper() + why[1:]))
 
 
+_backfill_lock = threading.Lock()
+
+
+def backfill_state():
+    import json
+
+    try:
+        return json.loads(R.db.get_state("backfill") or "null")
+    except ValueError:
+        return None
+
+
+def _run_backfill(days, by):
+    import json
+
+    from .pve import pve_client
+
+    def save(**kw):
+        st = backfill_state() or {}
+        st.update(kw)
+        R.db.set_state("backfill", json.dumps(st))
+
+    try:
+        save(status="running", days=days, step=0, steps=1, started=time.time(), by=by, problems=[])
+        kept, problems = snapshot.backfill(pve_client(R.load_settings()), days, lambda a, b: save(step=a, steps=b))
+        save(status="done", kept=kept, problems=problems[:5], finished=time.time())
+        R.notify(f"Past logs read ({days} days): {kept} warning and error lines kept"
+                 + (f". {problems[0]}" if problems else ""), by=by, admins_only=True)
+    except Exception as e:  # noqa: BLE001
+        log.exception("reading past logs failed")
+        save(status="failed", error=str(e) or e.__class__.__name__, finished=time.time())
+        R.notify(f"Reading past logs failed: {e}", "error", by=by, admins_only=True)
+    finally:
+        _backfill_lock.release()
+
+
+@app.post("/settings/backfill")
+@requires("settings")
+def settings_backfill():
+    try:
+        days = int(request.form.get("days", 30))
+        if not 1 <= days <= 365:
+            raise ValueError
+    except ValueError:
+        flash("Pick how many days of logs to read")
+        return redirect(url_for("settings"))
+    if not _backfill_lock.acquire(blocking=False):
+        flash("Past logs are already being read")
+        return redirect(url_for("settings"))
+    threading.Thread(target=_run_backfill, args=(days, me()), daemon=True).start()
+    flash(f"Reading the last {days} days of logs. The bell tells you when it's done")
+    return redirect(url_for("settings"))
+
+
+@app.get("/settings/backfill")
+@requires("settings")
+def settings_backfill_state():
+    return jsonify(backfill_state() or {})
+
+
 @app.route("/settings", methods=["GET", "POST"])
 @requires("settings")
 def settings():
@@ -749,6 +809,7 @@ def settings():
                                                                    for t, x in config.TEMPLATES.items()},
         logo_version=int(lp.stat().st_mtime) if (lp := config.logo_path()) else None,
         last_snapshot=R.db.get_state("last_snapshot"), snapshot_error=R.db.get_state("last_snapshot_error"),
+        backfill=backfill_state(), logs_from=R.db.get_state("logs_from"),
         fmt=lambda t: dt.datetime.fromtimestamp(int(t), config.TZ).strftime("%-d %b %H:%M") if t else "never",
     )
 

@@ -298,6 +298,7 @@ def view(d, p, kind, settings, on=None):
                          for b in d["buckets"]]
     v["health"] = d["health"]
     v["health_ok"] = sum(1 for h in d["health"] if h["tone"] == "ok")
+    v["logs_from_text"] = when(d.get("logs_from"), "%a %-d %b %H:%M") if d.get("logs_from") else ""
     v["logs"] = [{**lg, "when": when(lg["t"], "%a %-d %b %H:%M")} for lg in d["logs"][:12]]
     v["pbs"] = pbs_view(d.get("pbs"))
     v["timeline"] = timeline(d, v, warn_pct)
