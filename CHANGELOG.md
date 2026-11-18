@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Settings: the Save button stays in view at the bottom of the window, says when there are unsaved changes,
+  and the page asks before you leave with changes unsaved. The test email moved into the Email server section.
+
 - A refused API call now names the missing permission and how to fix it, in the command line, Settings and
   notifications, instead of a traceback.
 

@@ -44,6 +44,13 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
 .logo-tile { flex: none; width: 180px; height: 56px; padding: 8px; background: #ffffff; border: 1px solid var(--rule-2); border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; }
 .logo-tile img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .logo-tile span { width: 100%; text-align: center; font-size: 12px; color: #85847f; }
+/* the save button stays in view at the bottom of the window while the form is on screen */
+.savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+           padding: 12px 12px 12px 20px; background: var(--surface); border: 1px solid var(--rule-2); border-radius: 12px;
+           box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.save-state { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 8px; }
+.save-state.dirty { color: var(--ink); }
+.save-state.dirty::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 @media (max-width: 720px) { .looks { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid2, .grid3, .incl { grid-template-columns: 1fr; } .recips { grid-template-columns: 1fr; } .recips .col { display: none; } }
 </style>
 
@@ -169,6 +176,10 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
     <div class="field" style="margin:0"><label for="from">Send as</label><input type="text" id="from" name="from" value="{{ s.smtp.from }}" placeholder="Cluster reports &lt;reports@example.com&gt;"></div>
     <label class="check" style="margin-top:16px"><input type="checkbox" name="smtp_verify" {{ 'checked' if s.smtp.get('verify', True) }}> Check the mail server's certificate</label>
     <div class="hint">Untick only for an internal mail server with its own self-signed certificate</div>
+    <div class="bar" style="margin-top:16px">
+      <div class="field"><label for="tt">Save and send a test email to</label><input type="text" id="tt" name="test_to" placeholder="you@example.com"></div>
+      <button type="button" class="btn quiet" id="send-test">Save and send test</button>
+    </div>
   </section>
 
   <section class="panel">
@@ -197,14 +208,10 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
       <div class="hint">Local time, {{ tz }}</div></div>
   </section>
 
-  <section class="panel">
-    <div class="bar">
-      <button class="btn primary" name="action" value="save">Save settings</button>
-      <span class="muted">or</span>
-      <div class="field"><label for="tt">Save and send a test email to</label><input type="text" id="tt" name="test_to" placeholder="you@example.com"></div>
-      <button class="btn quiet" name="action" value="test">Send test</button>
-    </div>
-  </section>
+  <div class="savebar">
+    <span class="save-state" id="save-state" aria-live="polite">No changes</span>
+    <button class="btn primary" name="action" value="save" id="save">Save settings</button>
+  </div>
 </form>
 
 <form method="post" action="{{ url_for('settings_backfill') }}" class="panel" style="max-width:820px;margin-top:24px" id="backfill">
@@ -227,6 +234,23 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
 </form>
 <script>
 const form = document.getElementById('settings');
+// unsaved changes: say so next to the save button, and ask before leaving the page
+const state = document.getElementById('save-state');
+let dirty = false, submitting = false;
+function markDirty(e) {
+  if (e && e.target && (e.target.id === 'tt' || e.target.closest('#backfill'))) return;  // the test address isn't a setting
+  dirty = true; state.textContent = 'Unsaved changes'; state.classList.add('dirty');
+}
+form.addEventListener('input', markDirty);
+form.addEventListener('change', markDirty);
+form.addEventListener('submit', () => { submitting = true; });
+window.addEventListener('beforeunload', e => { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+// Enter in a field saves; only this button sends a test email
+document.getElementById('send-test').addEventListener('click', () => {
+  if (!document.getElementById('tt').value.trim()) { document.getElementById('tt').focus(); return; }
+  const a = document.createElement('input'); a.type = 'hidden'; a.name = 'action'; a.value = 'test';
+  form.append(a); submitting = true; form.submit();
+});
 document.querySelectorAll('[data-test]').forEach(btn => btn.addEventListener('click', async () => {
   const product = btn.dataset.test, out = document.getElementById(product + '-result');
   btn.disabled = true; out.className = 'result'; out.textContent = 'Testing…';
@@ -243,7 +267,7 @@ const accents = {{ all_accents|tojson }};
 const accent = document.getElementById('accent');
 const swatches = document.querySelectorAll('.sw');
 function mark() { swatches.forEach(s => s.setAttribute('aria-pressed', String(s.dataset.c === accent.value.toLowerCase()))); }
-swatches.forEach(s => s.addEventListener('click', () => { accent.value = s.dataset.c; mark(); }));
+swatches.forEach(s => s.addEventListener('click', () => { accent.value = s.dataset.c; mark(); markDirty(); }));
 accent.addEventListener('input', mark);
 document.querySelectorAll('input[name=template]').forEach(r => r.addEventListener('change', () => { accent.value = accents[r.value]; mark(); }));
 mark();
