@@ -5,6 +5,7 @@
 {% block footfont %}"JetBrains Mono", monospace{% endblock %}
 {% block footcolor %}#737373{% endblock %}
 {% block pagesep %}"/"{% endblock %}
+{% block headcontent %}"§ " string(topic){% endblock %}
 {% block style %}
 body { font-family: "JetBrains Mono", monospace; color: #171717; font-size: 12px; line-height: 16px; }
 .mono { font-family: "JetBrains Mono", monospace; }
@@ -50,6 +51,11 @@ table.t, table.L { font-size: 12px; line-height: 16px; }
 .top .t2 { color: #525252; }
 .counts { display: flex; padding: 8px 0; border-bottom: 1px solid rgba(23,23,23,.10); }
 .counts > span { margin-right: 24px; } .counts .gen { margin-left: auto; margin-right: 0; color: #525252; }
+
+/* pages 2+: dense mono tables with a hard rule under each section title, like a log file */
+.page .sec { border-bottom: 2px solid #171717; padding-bottom: 4px; }
+.page .sec.h3 { border-bottom: 1px solid #171717; }
+.lede { padding: 6px 0; border-bottom: 1px dashed rgba(23,23,23,.25); }
 {% endblock %}
 
 {% block body %}

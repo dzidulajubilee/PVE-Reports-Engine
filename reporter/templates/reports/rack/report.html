@@ -2,6 +2,8 @@
 {% set opt = {"plate": False, "lower": False, "plain": False, "list": False} %}
 {% import "reports/_pages.html" as P with context %}
 {% block margin %}64px 64px 96px{% endblock %}
+{% block headcontent %}"▌ " string(topic){% endblock %}
+{% block headextra %}color: #1c1c1e;{% endblock %}
 {% block style %}
 body { font-family: "IBM Plex Sans", sans-serif; color: #171717; font-size: 13px; line-height: 20px; }
 .mono { font-family: "IBM Plex Mono", monospace; }
@@ -78,6 +80,14 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 .figs .l, .figs .c2 { font-size: 12px; line-height: 16px; color: #525252; }
 .figs .v { margin: 4px 0; font-size: 28px; line-height: 32px; font-weight: 500; } .figs .v span { font-size: 14px; color: #525252; }
 .nodes2 { margin-top: 8px; }
+
+/* pages 2+: section labels and table heads in the rack's dark units */
+.h3 { display: inline-block; background: #2b2b2d; color: #e8e8e8; padding: 2px 10px; border-radius: 4px;
+      font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 20px; margin-bottom: 8px; }
+.t th { background: #1c1c1e; color: #e8e8e8; padding: 6px 8px; border-bottom: 0; }
+.t th:first-child { padding-left: 8px; } .t td:first-child { padding-left: 8px; }
+.t tr:nth-child(even) td { background: #f6f6f7; }
+.sub { margin-top: 2px; }
 {% endblock %}
 
 {% block body %}

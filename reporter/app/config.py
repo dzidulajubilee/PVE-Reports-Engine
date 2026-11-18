@@ -12,7 +12,6 @@ TZ = ZoneInfo(os.environ.get("TZ") or "UTC")
 
 OUT = Path(os.environ.get("OUT_DIR", "/out"))
 ROOT = Path(__file__).resolve().parent.parent  # reporter/: templates/ and fonts/ live here
-DB = OUT / "reporter.db"  # users, audit log, snapshots and collected logs
 
 log = logging.getLogger("reporter")
 

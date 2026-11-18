@@ -105,7 +105,7 @@ def storage_lines(rows, warn_pct, accent, end, w=650, h=280, mono="IBM Plex Mono
         return ""
     if len(series) == 1:
         return storage_chart(series[0][0], warn_pct, accent, end, w, h, mono, warn_color, ink, muted, grid, axis, fs)
-    lead, lead_pts = series[0]
+    lead_pts = series[0][1]
     t0 = min(p[0][0] for _, p in series)
     last = max(p[-1][0] for _, p in series)
     t1 = last + 2 * 7 * DAY

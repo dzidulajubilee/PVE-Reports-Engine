@@ -84,6 +84,14 @@ h1 { font-size: 30px; line-height: 1.15; font-weight: 500; }
 .card .foot { border-top: 1px solid rgba(27,27,26,.10); padding-top: 8px; font-size: 12px; color: #52514e; }
 .card .foot span { display: block; }
 .slot { width: 120px; height: 36px; }
+
+/* pages 2+: every section a bordered card, like the node cards on page 1 */
+.page section { border: 1px solid rgba(27,27,26,.16); border-radius: 8px; padding: 16px 20px; }
+.page section.two, .page section.chart { border: 0; padding: 0; }  /* the chart is drawn to the page width */
+.page section.two .col { border: 1px solid rgba(27,27,26,.16); border-radius: 8px; padding: 16px 20px; }
+.page section .t th:first-child, .page section .t td:first-child { padding-left: 0; }
+.ptitle { padding-bottom: 8px; border-bottom: 2px solid {{ accent }}; display: inline-block; }
+.datanote { border-style: solid; }
 {% endblock %}
 
 {% macro bar(label, avg, peak, text, hot=False) -%}

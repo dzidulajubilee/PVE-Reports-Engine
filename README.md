@@ -6,7 +6,12 @@ an account can make one for any dates in the web portal.
 
 - **Four areas:** capacity, VMs and containers, backups, and cluster health. Optional Proxmox Backup Server section.
 - **Six looks**, picked in Settings: Logbook (the default), Original, Briefing (for managers), Ledger (for
-  engineers), Rack (for wall printouts) and Pulse (a heatmap for capacity planning).
+  engineers), Rack (for wall printouts) and Pulse (a heatmap for capacity planning). Every page keeps its look,
+  and **Preview all pages** opens the whole report in any look and accent, from your latest figures.
+- **Single node or cluster**, worked out on every report: wording, availability and checks follow the setup.
+- **Optional sections**, each switchable: failed tasks, trends, certificates, disks inside guests, sign-ins and
+  firewall, resource pressure, backup jobs and coverage, replication, network traffic, pools and tags, cluster
+  network and storage detail.
 - **Two versions of every report** from one data collection: the full report and a one-page summary.
 - **Read-only.** An API token with a read-only role; the reporter can't change anything in the cluster.
 - **Every figure from data.** When something can't be read it shows as –, and comparisons with the previous period

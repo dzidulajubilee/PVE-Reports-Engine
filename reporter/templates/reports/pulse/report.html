@@ -4,6 +4,7 @@
 {% block margin %}64px 64px 96px{% endblock %}
 {% block footfont %}"Geist Mono", monospace{% endblock %}
 {% block footcolor %}#6b7487{% endblock %}
+{% block headextra %}color: {{ accent }};{% endblock %}
 {% block style %}
 body { font-family: "Geist", sans-serif; color: #111827; font-size: 13px; line-height: 20px; }
 .mono { font-family: "Geist Mono", monospace; }
@@ -73,6 +74,12 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 .right .fl { font-size: 12px; line-height: 16px; color: #4b5565; }
 .right .fv { margin-top: 4px; font-size: 28px; line-height: 32px; font-weight: 500; }
 .right .fv span { font-size: 14px; color: #4b5565; font-weight: 400; }
+
+/* pages 2+: an accent marker on each section, tinted table heads, bars drawn as heat */
+.h3::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; background: {{ accent }}; vertical-align: 1px; }
+.t th { background: #f3f5f9; padding: 6px 8px; border-bottom: 0; }
+.t th:first-child { padding-left: 8px; } .t td:first-child { padding-left: 8px; }
+.ptitle { padding-left: 12px; border-left: 4px solid {{ accent }}; }
 {% endblock %}
 
 {% block body %}

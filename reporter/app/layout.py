@@ -9,10 +9,8 @@ HEADINGS = {"h1", "h2", "h3"}
 # under the previous one starts there instead of leaving a near-empty page. The small blocks inside them (.keep: a
 # heading with its table or chart) still stay together.
 LOOSE_CSS = (
-    "section:not(.keep), section.summary, section.flow, .cols, .attention { break-inside: auto !important; }"
+    "section:not(.keep), section.summary, section.flow { break-inside: auto !important; }"
     " .head, h2, h3 { break-after: avoid !important; } tr, li { break-inside: avoid; }"
-    # topic pages flow on instead of each starting a fresh page
-    " .page { break-before: auto !important; margin-top: 48px; }"
     # a chart stays with its caption, and a topic's title with its first lines
     " section.chart { break-inside: avoid !important; } .lede { break-after: avoid; }"
 )
@@ -66,7 +64,12 @@ def problems(document, min_fill=0.3):
             out.append(f"page {n}: {what} runs past the bottom of the page")
         bottom = max(b.position_y + b.margin_height() for b, _, _ in texts)
         fill = (bottom - top) / page._page_box.height
-        if n < len(pages) and fill < min_fill:
+        # a topic's last page may be short when the next topic starts a fresh page by design
+        topics_here = {id(e) for _, _, els in texts for e in els if "page" in (e.get("class") or "").split()}
+        next_topic = n < len(pages) and any(
+            "page" in (e.get("class") or "").split() and id(e) not in topics_here
+            for _, _, els in list(_text_boxes(pages[n]._page_box.children[0]))[:1] for e in els)
+        if n < len(pages) and fill < min_fill and not (next_topic and fill >= 0.08):
             out.append(f"page {n} is {fill:.0%} full and the rest moved to page {n + 1}")
         if n == len(pages):
             continue

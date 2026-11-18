@@ -282,7 +282,7 @@ def view(d, p, kind, settings, on=None):
     v["fig"] = {f["key"]: f for f in figs}
 
     # ---- attention
-    att = attention(d, v, word, this, warn_pct, n_nodes)
+    att = attention(d, v, word, this, warn_pct)
     v["attention"] = att
     v["att_top"], v["att_more"] = att[:4], att[4:]
     from .extras import view_extras
@@ -299,11 +299,11 @@ def view(d, p, kind, settings, on=None):
     v["warn"] = [a for a in att if a["level"] == "warn"]
 
     # ---- sentences
-    v["headline"], v["subline"] = sentences(d, v, word, this, n_nodes)
+    v["headline"], v["subline"] = sentences(d, v, word)
     v["plain_line"] = plain_line(d, v)
     v["guest_line"] = guest_line(g, word)
-    v["backup_line"] = backup_line(b, word, this)
-    v["capacity_line"] = capacity_line(v["main"], warn_pct, word)
+    v["backup_line"] = backup_line(b, this)
+    v["capacity_line"] = capacity_line(v["main"], warn_pct)
 
     # ---- nodes
     nrows = []
@@ -317,7 +317,7 @@ def view(d, p, kind, settings, on=None):
                       "ram_given_text": fmem(n["ram_given"]), "ram_total_text": fmem(n["ram_total"]),
                       "guests_text": f"{plural(n['guests'], 'guest')} · {n['vcpu']} vCPU on {n['cores'] or '–'} cores"})
     v["nodes"] = nrows
-    v["memory_note"] = memory_note(d, word)
+    v["memory_note"] = memory_note(d)
     v["writes_note"] = writes_note(d, v)
 
     # ---- guests
@@ -390,7 +390,7 @@ def up_long(secs):
     return f"{d:.0f} days" if d >= 2 else f"{secs / 3600:.0f} hours"
 
 
-def attention(d, v, word, this, warn_pct, n_nodes):
+def attention(d, v, word, this, warn_pct):
     """Only what is actually wrong or unusual, most serious first: what happened, where and how much."""
     out = []
 
@@ -526,7 +526,7 @@ def fmin(m):
     return f"{h:.1f} hours" if h < 48 else f"{h / 24:.1f} days"
 
 
-def sentences(d, v, word, this, n_nodes):
+def sentences(d, v, word):
     bad, warn = v["bad"], v["warn"]
     rough = any(a["area"] == "availability" and a["level"] == "bad" for a in bad)
     mood = "A rough" if rough else "A steady"
@@ -602,10 +602,6 @@ def plain_line(d, v):
     return first + " Nothing needs a decision."
 
 
-def _lower(s):
-    return s[0].lower() + s[1:] if s and not s[:2].isupper() and not s.split(" ")[0].count("-") else s
-
-
 def guest_line(g, word):
     s = f"{plural(g['total'], 'guest')}: {plural(g['vms'], 'VM')} and {plural(g['cts'], 'container')}."
     bits = []
@@ -620,7 +616,7 @@ def guest_line(g, word):
     return s
 
 
-def backup_line(b, word, this):
+def backup_line(b, this):
     if not b["runs_total"]:
         return f"No backups ran {this}." + (" No backup jobs are set up." if not b.get("jobs") else "")
     s = f"{b['runs_ok']} of {b['runs_total']} backups ran."
@@ -640,7 +636,7 @@ def backup_line(b, word, this):
     return s
 
 
-def capacity_line(main, warn_pct, word):
+def capacity_line(main, warn_pct):
     if not main:
         return "No storage figures could be read."
     who = "Shared storage" if main["shared"] else f"The fullest guest storage, {main['on']},"
@@ -657,7 +653,7 @@ def capacity_line(main, warn_pct, word):
     return s
 
 
-def memory_note(d, word):
+def memory_note(d):
     nodes = [n for n in d["nodes"] if n["mem_max"] is not None]
     if not nodes:
         return ""

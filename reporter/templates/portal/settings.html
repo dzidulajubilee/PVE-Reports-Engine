@@ -35,6 +35,8 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
 .look img { display: block; width: 100%; aspect-ratio: 210 / 297; object-fit: cover; object-position: top; border-radius: 4px; background: #fff; border: 1px solid var(--rule); }
 .look .ln { display: block; margin-top: 8px; font-weight: 500; font-size: 14px; }
 .look .lf { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.look .preview { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+.look .preview:hover { color: var(--ink); }
 .accent-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .sw { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--rule-2); cursor: pointer; padding: 0; transition: transform .1s; }
 .sw:active { transform: scale(.96); }
@@ -111,9 +113,11 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
       {% for key, t in templates.items() %}
       <label class="look"><input type="radio" name="template" value="{{ key }}" {{ 'checked' if key == template }}>
         <img src="{{ url_for('static', filename='previews/' ~ key ~ '.png') }}" alt="Page 1 of the {{ t.label }} report" loading="lazy">
-        <span class="ln">{{ t.label }}</span><span class="lf">{{ t.for }}</span></label>
+        <span class="ln">{{ t.label }}</span><span class="lf">{{ t.for }}</span>
+        <a class="preview" href="{{ url_for('preview', template=key) }}" target="_blank" rel="noopener" data-preview="{{ key }}">Preview all pages</a></label>
       {% endfor %}
     </div>
+    <p class="hint">{% if preview_made %}Previews use the figures from your latest report ({{ preview_made.strftime('%-d %b %H:%M') }}) and your current sections. Nothing is saved or sent{% else %}Previews use a sample cluster until the first report is made; after that they show your own figures{% endif %}</p>
     <div class="accent-row">
       <label for="accent" style="margin:0 8px 0 0">Accent</label>
       <input type="text" id="accent" name="accent" value="{{ accent }}" pattern="#[0-9a-fA-F]{6}">
@@ -281,6 +285,14 @@ mark();
   else location.reload();
 })();
 {% endif %}
+// a preview opens in the accent shown here for that look, saved or not
+document.querySelectorAll('[data-preview]').forEach(link => link.addEventListener('click', e => {
+  e.stopPropagation();
+  const key = link.dataset.preview;
+  const chosen = document.querySelector('input[name=template]:checked');
+  const colour = chosen && chosen.value === key ? accent.value : accents[key];
+  link.href = link.href.split('?')[0] + (/^#[0-9a-fA-F]{6}$/.test(colour || '') ? '?accent=' + encodeURIComponent(colour) : '');
+}));
 const tabs = document.querySelectorAll('.flip [role="tab"]');
 tabs.forEach(tab => tab.addEventListener('click', () => {
   tabs.forEach(t => { const on = t === tab; t.setAttribute('aria-selected', String(on)); document.getElementById(t.getAttribute('aria-controls')).hidden = !on; });

@@ -38,3 +38,31 @@ def test_summary_is_one_page(tmp_path):
     for t in config.TEMPLATES:
         html = render("weekly", start, end, d, p, st, "summary", set(), template=t)
         assert len(HTML(string=html, base_url=str(config.ROOT)).render().pages) == 1, t
+
+
+def test_reports_load_only_bundled_fonts_and_the_logo():
+    from app.build import safe_fetcher
+
+    f = safe_fetcher()
+    assert f.fetch((config.ROOT / "fonts" / "Inter-400.ttf").as_uri())
+    for url in ("file:///etc/passwd", (config.ROOT / "app" / "config.py").as_uri(), "http://192.0.2.1/x.png",
+                "data:image/x-eps;base64,JSFQUw=="):
+        try:
+            f.fetch(url)
+        except Exception:  # noqa: BLE001
+            continue
+        raise AssertionError(f"{url} was loaded")
+
+
+def test_reports_use_the_bundled_fonts(tmp_path):
+    """A blocked font falls back silently to a system font, so check what the PDF actually embeds."""
+    st = config.load_settings()
+    start, end, d, p = fake_report.typical()
+    want = {"logbook": b"IBM-Plex-Sans", "briefing": b"Newsreader", "ledger": b"JetBrains", "pulse": b"Geist"}
+    from app.build import safe_fetcher
+    from weasyprint import HTML
+
+    for t, font in want.items():
+        html = render("weekly", start, end, d, p, st, "summary", set(), template=t)
+        pdf = HTML(string=html, base_url=str(config.ROOT), url_fetcher=safe_fetcher()).write_pdf(uncompressed_pdf=True)
+        assert font in pdf, t  # font names are only readable when the PDF isn't compressed

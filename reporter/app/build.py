@@ -26,16 +26,39 @@ CHART_LOOK = {
 CONTENT_WIDTH = {"logbook": 650, "original": 666, "briefing": 634, "ledger": 682, "rack": 666, "pulse": 666}
 
 
+def safe_fetcher():
+    """A fetcher for WeasyPrint that loads only the bundled fonts, the uploaded logo, and inline PNG or JPEG images:
+    nothing from the network or elsewhere on disk, whatever an uploaded SVG logo might reference."""
+    from urllib.parse import unquote, urlsplit
+
+    from weasyprint.urls import URLFetcher
+
+    class Safe(URLFetcher):
+        def fetch(self, url, headers=None):
+            u = urlsplit(url)
+            if u.scheme == "file":
+                path = config.Path(unquote(u.path)).resolve()
+                logo = config.logo_path()
+                allowed = [(config.ROOT / "fonts").resolve()] + ([logo.resolve()] if logo else [])
+                if any(path == a or a in path.parents for a in allowed):
+                    return super().fetch(url, headers)
+            elif u.scheme == "data" and url[5:].lower().startswith(("image/png", "image/jpeg")):
+                return super().fetch(url, headers)
+            raise ValueError(f"not loaded: {url[:60]}")
+
+    return Safe(allowed_protocols=("file", "data"))
+
+
 def render_pdf(html_out, pdf):
     """Lay the report out, check the page flow, and if the check finds problems lay it out once more with looser
     page breaks, keeping whichever has fewer. Writes the PDF and returns the problems left (usually none)."""
     from weasyprint import HTML  # imported late: slow to load, not needed until a report is due
 
-    doc = HTML(string=html_out, base_url=str(config.ROOT)).render()
+    doc = HTML(string=html_out, base_url=str(config.ROOT), url_fetcher=safe_fetcher()).render()
     issues = layout.problems(doc)
     if issues:
         loose = html_out.replace("</head>", f"<style>{layout.LOOSE_CSS}</style></head>", 1)
-        doc2 = HTML(string=loose, base_url=str(config.ROOT)).render()
+        doc2 = HTML(string=loose, base_url=str(config.ROOT), url_fetcher=safe_fetcher()).render()
         issues2 = layout.problems(doc2)
         log.info("layout: %d problem(s), %d with looser page breaks", len(issues), len(issues2))
         if len(issues2) < len(issues):
@@ -43,8 +66,11 @@ def render_pdf(html_out, pdf):
     for issue in issues:
         log.warning("%s layout: %s", pdf.name, issue)
     tmp = pdf.with_suffix(".part")
-    doc.write_pdf(tmp)
-    tmp.replace(pdf)  # appears in the portal only once complete
+    try:
+        doc.write_pdf(tmp)
+        tmp.replace(pdf)  # appears in the portal only once complete
+    finally:
+        tmp.unlink(missing_ok=True)  # never leave half a PDF behind
     return issues
 
 
@@ -106,6 +132,46 @@ def render(kind, start, end, d, p, st, style, shown, template=None, accent=None,
     )
 
 
+LAST = OUT / "last-data.json"  # the latest report's figures, so previews in Settings show real data quickly
+
+
+def save_last(kind, start, end, d, p):
+    import os
+
+    try:
+        tmp = LAST.with_suffix(".part")
+        tmp.write_text(json.dumps({"kind": kind, "start": start.isoformat(), "end": end.isoformat(), "d": d, "p": p,
+                                   "made": dt.datetime.now(config.TZ).isoformat()}, default=str))
+        os.chmod(tmp, 0o600)
+        tmp.replace(LAST)
+    except (OSError, TypeError, ValueError) as e:  # a preview convenience: never fail a report over it
+        log.warning("couldn't keep the report data for previews: %s", e)
+
+
+def preview_data():
+    """(kind, start, end, d, p, made) from the latest report, or the sample cluster before the first one."""
+    try:
+        x = json.loads(LAST.read_text())
+        return (x["kind"], dt.datetime.fromisoformat(x["start"]), dt.datetime.fromisoformat(x["end"]), x["d"], x["p"],
+                dt.datetime.fromisoformat(x["made"]))
+    except (OSError, ValueError, KeyError):
+        from .sample import typical
+
+        start, end, d, p = typical()
+        return "weekly", start, end, d, p, None
+
+
+def preview_pdf(template, accent=None):
+    """The whole full report in one look, as PDF bytes, from the latest report's data (nothing is saved)."""
+    from weasyprint import HTML
+
+    st = load_settings()
+    kind, start, end, d, p, _ = preview_data()
+    shown = {k for k, v in st["sections"].items() if v}
+    html_out = render(kind, start, end, d, p, st, "full", shown, template=template, accent=accent)
+    return HTML(string=html_out, base_url=str(config.ROOT), url_fetcher=safe_fetcher()).write_pdf()
+
+
 def build(kind, end=None, start=None):
     st = load_settings()  # applies the time zone before any dates are worked out
     end = end or period_end(kind, dt.datetime.now(config.TZ))
@@ -127,6 +193,7 @@ def build(kind, end=None, start=None):
     p = collect(S, prev_start, start, st, full=False)
     d["_errors"] = len(S.errors)
     d["_denied"] = sorted(S.denied)
+    save_last(kind, start, end, d, p)
     OUT.mkdir(parents=True, exist_ok=True)
     pdfs, layout_issues, lines = {}, {}, []
     for style in STYLES:

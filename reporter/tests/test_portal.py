@@ -88,3 +88,18 @@ def test_admin_only_notes(accounts):
     assert "mail failed" not in [n["text"] for n in v["items"]]
     o = as_role("operator", accounts).get("/notifications").get_json()
     assert "mail failed" in [n["text"] for n in o["items"]]
+
+
+def test_failed_sign_in_table_forgets_old_addresses(accounts):
+    web._fails.clear()
+    web._fails["192.0.2.9"] = [time.time() - 600]
+    web.recent_fails("198.51.100.1")
+    assert "192.0.2.9" not in web._fails
+
+
+def test_preview_renders_every_look(accounts):
+    for t in ("logbook", "rack"):
+        r = as_role("admin", accounts).get(f"/settings/preview/{t}?accent=%23123456")
+        assert r.status_code == 200 and r.data[:5] == b"%PDF-"
+    assert as_role("operator", accounts).get("/settings/preview/logbook").status_code == 403
+    assert as_role("admin", accounts).get("/settings/preview/nope").status_code == 404

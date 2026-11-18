@@ -54,7 +54,7 @@ table.t { font-size: 13px; }
 .hdr { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 16px; border-bottom: 1px solid rgba(23,23,23,.28); }
 .kicker { font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 16px; color: #525252; margin-bottom: 8px; }
 h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
-.meta { font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 16px; color: #525252; text-align: right; }
+.meta { font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 16px; color: #525252; margin-top: 8px; }
 .headline { margin-top: 24px; font-size: 18px; line-height: 28px; max-width: 600px; }
 .subline { margin-top: 4px; font-size: 14px; line-height: 22px; color: #525252; max-width: 600px; }
 .att { margin-top: 20px; }
@@ -98,11 +98,9 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
     <div>
       <p class="kicker">{{ kicker }}</p>
       <h1>{{ noun }} report, {{ week_word }}</h1>
+      <p class="meta">{{ dates if kind != "custom" else title }} · {{ v.nodes|length }} node{{ 's' if v.nodes|length != 1 }} · {{ d.guests.total }} guest{{ 's' if d.guests.total != 1 }} · made {{ generated.strftime('%-d %b %H:%M') }}</p>
     </div>
-    <div style="text-align:right">
-      {% if logo %}<img class="logo" src="{{ logo }}" alt="" style="margin-bottom:8px"><br>{% endif %}
-      <p class="meta">{{ dates if kind != "custom" else title }}<br>{{ v.nodes|length }} node{{ 's' if v.nodes|length != 1 }} · {{ d.guests.total }} guest{{ 's' if d.guests.total != 1 }}<br>made {{ generated.strftime('%-d %b %H:%M') }}</p>
-    </div>
+    {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
   </div>
 
   <p class="headline">{{ v.headline }}</p>

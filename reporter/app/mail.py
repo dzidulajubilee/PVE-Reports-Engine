@@ -57,15 +57,9 @@ def mail_error(e):
         return "the mail server name couldn't be found; check the SMTP server setting"
     if isinstance(e, smtplib.SMTPRecipientsRefused):
         return f"the mail server refused the address(es): {', '.join(e.recipients)}"
-    if isinstance(e, (smtplib.SMTPNotSupportedError, ssl_error_types())):
+    if isinstance(e, (smtplib.SMTPNotSupportedError, ssl.SSLError)):
         return "the security setting doesn't match the mail server; try STARTTLS on port 587 or SSL/TLS on 465"
     return str(e) or e.__class__.__name__
-
-
-def ssl_error_types():
-    import ssl
-
-    return ssl.SSLError
 
 
 def email_report(pdf, subject, lines, to, style="full"):

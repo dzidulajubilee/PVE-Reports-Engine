@@ -60,7 +60,7 @@ def collect_extras(S, d, ctx, on):
     if "replication" in on:
         d["x_replication"] = replication(S, online, names)
     if "pools" in on:
-        d["x_pools"] = pools(d, guests_res)
+        d["x_pools"] = pools(d)
     if "cluster_net" in on and d.get("topology", {}).get("cluster"):
         d["x_cluster_net"] = cluster_net(S, s_, e_)
     if "storage_detail" in on:
@@ -224,7 +224,7 @@ def replication(S, online, names):
     return sorted(rows, key=lambda r: (-(r["fail_count"]), r["last_sync"] or 0))
 
 
-def pools(d, guests_res):
+def pools(d):
     """Allocation and use per pool, and how many guests carry each tag, for reports split by team or customer."""
     by = defaultdict(list)
     for g in d["guests"]["list"]:

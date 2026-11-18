@@ -409,7 +409,7 @@ def collect(S, start, end, settings, full=True, now=None, kind=None, on=None):
             x.setdefault("node", n)
             tasks.append(x)
     d["tasks_read"] = bool(online)
-    backups = collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full, online)
+    backups = collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, tz, full, online)
     d["backups"] = backups
 
     # ---- storage (RRD history works for past periods too)
@@ -472,7 +472,7 @@ def collect(S, start, end, settings, full=True, now=None, kind=None, on=None):
     d["nodes"] = nodes
 
     # ---- guests
-    d["guests"] = collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks)
+    d["guests"] = collect_guests(S, guests_res, tasks, s_, e_, now)
     current = {"running": sum(1 for g in guests_res if g.get("status") == "running"), "total": len(guests_res)}
     d["guests_running"] = current if e_ >= now - 900 else running_at(e_ - 1)
     if d["guests_running"] is None:  # a period before the reporter recorded anything: say what's running now
@@ -481,7 +481,7 @@ def collect(S, start, end, settings, full=True, now=None, kind=None, on=None):
     d["snapshots"] = collect_snapshots(S, guests_res, now, settings["general"].get("snapshot_days", 30))
 
     # ---- health
-    d["health"] = collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now)
+    d["health"] = collect_health(S, nodes, stores_res, storage_cfg, sc, d, s_, e_, now)
     d["logs"], d["log_lines"] = logs_between(s_, e_)
     d["logs_collected"] = db.one("select count(*) as n from logs")["n"] > 0
     lf = db.get_state("logs_from")
@@ -579,7 +579,7 @@ def collect_storage(S, stores_res, storage_cfg, start, end, now, settings):
     return out
 
 
-def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, tz, full, online_nodes=()):
+def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, tz, full, online_nodes=()):
     names = {g["vmid"]: g.get("name") or str(g["vmid"]) for g in guests_res}
     runs = []
     for t in tasks:
@@ -704,7 +704,7 @@ def collect_backups(S, tasks, guests_res, stores_res, storage_cfg, bks, s_, e_, 
     return out
 
 
-def collect_guests(S, guests_res, tasks, s_, e_, now, settings, bks):
+def collect_guests(S, guests_res, tasks, s_, e_, now):
     sg = snap_guests(s_, e_)
     out = []
     for g in guests_res:
@@ -837,7 +837,7 @@ def collect_snapshots(S, guests_res, now, days):
     return sorted(out, key=lambda s: -s["age"])
 
 
-def collect_health(S, nodes, online, stores_res, storage_cfg, sc, d, s_, e_, now):
+def collect_health(S, nodes, stores_res, storage_cfg, sc, d, s_, e_, now):
     """[{key, what, state, tone}] for the cluster health list; tone ok, warn or bad."""
     h = []
     cov = d["coverage"]

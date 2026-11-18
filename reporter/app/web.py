@@ -7,6 +7,7 @@ reports into the same queue, and the snapshot thread that records the cluster ev
 
 import datetime as dt
 import itertools
+import json
 import logging
 import os
 import queue
@@ -149,7 +150,15 @@ def scheduler():
 
 # ---------------------------------------------------------------- sessions and permissions
 
-_fails = {}  # ip -> [timestamps]
+_fails = {}  # ip -> [timestamps] of failed attempts in the last 5 minutes
+
+
+def recent_fails(ip):
+    """Failed attempts from ip in the last 5 minutes; addresses with none are forgotten, so the table can't grow."""
+    cut = time.time() - 300
+    for k in [k for k, ts in _fails.items() if not ts or ts[-1] <= cut]:
+        _fails.pop(k, None)
+    return [t for t in _fails.get(ip, []) if t > cut]
 
 
 def current_user():
@@ -238,7 +247,7 @@ def setup():
     error = None
     if request.method == "POST":
         ip = request.remote_addr
-        recent = [t for t in _fails.get(ip, []) if t > time.time() - 300]
+        recent = recent_fails(ip)
         f = request.form
         if len(recent) >= 5:
             error = "Too many attempts. Try again in 5 minutes"
@@ -265,7 +274,7 @@ def login():
     error = None
     if request.method == "POST":
         ip = request.remote_addr
-        recent = [t for t in _fails.get(ip, []) if t > time.time() - 300]
+        recent = recent_fails(ip)
         if len(recent) >= 5:
             error = "Too many failed attempts. Try again in 5 minutes"
         else:
@@ -686,8 +695,6 @@ _backfill_lock = threading.Lock()
 
 
 def backfill_state():
-    import json
-
     try:
         return json.loads(R.db.get_state("backfill") or "null")
     except ValueError:
@@ -695,8 +702,6 @@ def backfill_state():
 
 
 def _run_backfill(days, by):
-    import json
-
     from .pve import pve_client
 
     def save(**kw):
@@ -850,6 +855,16 @@ def missing_nodes(s):
             and x["name"].lower() not in given and (x.get("ip") or "").lower() not in given]
 
 
+def preview_made():
+    """When the data previews use was collected, or None before the first report."""
+    from .build import LAST
+
+    try:
+        return dt.datetime.fromisoformat(json.loads(LAST.read_text())["made"]).astimezone(config.TZ)
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def settings_context(s, lk):
     return dict(
         s=s, has_password=bool(s["smtp"].get("password")),
@@ -859,9 +874,31 @@ def settings_context(s, lk):
                                                                    for t, x in config.TEMPLATES.items()},
         logo_version=int(lp.stat().st_mtime) if (lp := config.logo_path()) else None,
         last_snapshot=R.db.get_state("last_snapshot"), snapshot_error=R.db.get_state("last_snapshot_error"),
+        preview_made=preview_made(),
         backfill=backfill_state(), logs_from=R.db.get_state("logs_from"),
         fmt=lambda t: dt.datetime.fromtimestamp(int(t), config.TZ).strftime("%-d %b %H:%M") if t else "never",
     )
+
+
+_preview_lock = threading.Lock()
+
+
+@app.get("/settings/preview/<template>")
+@requires("settings")
+def preview(template):
+    """The full report in one look, opened in the browser, from the latest report's data. Nothing is saved."""
+    if template not in config.TEMPLATES:
+        abort(404)
+    accent = request.args.get("accent", "")
+    accent = accent if config.HEX.match(accent) else None
+    from .build import preview_pdf
+
+    with _preview_lock:  # one at a time: laying out a report is heavy
+        pdf = preview_pdf(template, accent)
+    r = app.response_class(pdf, mimetype="application/pdf")
+    r.headers["Content-Disposition"] = f'inline; filename="preview-{template}.pdf"'
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 def logo_from(upload):

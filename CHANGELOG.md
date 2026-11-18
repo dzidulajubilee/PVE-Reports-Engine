@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Logbook: dates, node and guest counts and the time made sit under the title; the upper right is left for
+  the logo.
+
+- Every page keeps its look: each template styles pages 2 onwards in its own way, and every page after the first
+  names the topic it belongs to.
+- Preview all pages: Settings opens the whole report in any look and accent, from the latest report's figures
+  (or a sample cluster before the first report). Nothing is saved or sent.
+- Page flow: each topic starts on a fresh page; a short last page of a topic is accepted instead of flattening
+  the layout.
+- Security: Flask 3.1.3 and WeasyPrint 70.0 (known vulnerabilities fixed); PDF rendering may load only the
+  bundled fonts, the uploaded logo and inline PNG or JPEG images.
+- Fixed a slow memory leak in the sign-in rate limit, half-written PDFs left behind after a failed render, and
+  stale code.
+
 - Twelve new sections, each switchable in Settings: failed tasks, trends, certificates, disks inside guests,
   sign-ins and firewall, resource pressure, backup jobs and coverage, replication, network traffic, pools and
   tags, cluster network, storage detail. The serious findings also appear in Needs attention.
