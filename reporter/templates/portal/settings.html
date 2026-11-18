@@ -37,6 +37,13 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
 .look .lf { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
 .look .preview { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 .look .preview:hover { color: var(--ink); }
+/* the logo picker: the real input stays focusable for keyboards but is drawn as a quiet button */
+.file-pick { position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.file-pick input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.file-pick label.btn { margin: 0; color: var(--ink); }
+.file-pick input[type=file]:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+.file-name { font-size: 13px; color: var(--ink-3); overflow-wrap: anywhere; }
+.file-name.chosen { color: var(--ink); }
 .accent-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .sw { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--rule-2); cursor: pointer; padding: 0; transition: transform .1s; }
 .sw:active { transform: scale(.96); }
@@ -128,8 +135,14 @@ textarea { min-height: 96px; font-family: PlexMono, ui-monospace, monospace; fon
     <div class="logo-row" style="margin-top:0">
       <div class="logo-tile">{% if logo_version %}<img src="{{ url_for('logo_preview', v=logo_version) }}" alt="Current logo">{% else %}<span>No logo</span>{% endif %}</div>
       <div style="flex:1;min-width:220px">
-        <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
-        <div class="hint">PNG, JPEG or SVG up to 1 MB, shown on the first page</div>
+        <div class="file-pick">
+          <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
+          <label for="logo" class="btn quiet small">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>
+            {{ "Replace logo" if logo_version else "Choose a logo" }}</label>
+          <span class="file-name" id="logo-name">{{ "" if logo_version else "No file chosen" }}</span>
+        </div>
+        <div class="hint">PNG, JPEG or SVG up to 1 MB, shown on the first page. Saved with the settings</div>
         {% if logo_version %}<label class="check" style="margin-top:8px"><input type="checkbox" name="remove_logo"> Remove the logo</label>{% endif %}
       </div>
     </div>
@@ -293,6 +306,20 @@ document.querySelectorAll('[data-preview]').forEach(link => link.addEventListene
   const colour = chosen && chosen.value === key ? accent.value : accents[key];
   link.href = link.href.split('?')[0] + (/^#[0-9a-fA-F]{6}$/.test(colour || '') ? '?accent=' + encodeURIComponent(colour) : '');
 }));
+// show the chosen logo's name and a preview in the tile before saving
+const logoIn = document.getElementById('logo');
+logoIn.addEventListener('change', () => {
+  const f = logoIn.files[0], name = document.getElementById('logo-name'), tile = document.querySelector('.logo-tile');
+  if (!f) return;
+  name.textContent = f.name + (f.size > 1048576 ? ' — larger than 1 MB, choose a smaller file' : '');
+  name.classList.add('chosen');
+  if (f.size <= 1048576 && /^image\/(png|jpeg|svg\+xml)$/.test(f.type)) {
+    const img = document.createElement('img');
+    img.alt = 'Chosen logo';
+    img.src = URL.createObjectURL(f);
+    tile.replaceChildren(img);
+  }
+});
 const tabs = document.querySelectorAll('.flip [role="tab"]');
 tabs.forEach(tab => tab.addEventListener('click', () => {
   tabs.forEach(t => { const on = t === tab; t.setAttribute('aria-selected', String(on)); document.getElementById(t.getAttribute('aria-controls')).hidden = !on; });

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Settings: the logo picker is a quiet button that shows the chosen file's name and previews it before saving.
+
 - Logbook: dates, node and guest counts and the time made sit under the title; the upper right is left for
   the logo.
 
