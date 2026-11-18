@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- nginx 1.31.9, which fixes the five "nginx2root" CVEs (CVE-2026-123007, -123633, -123634, -121810,
+  -113425). The portal never used the affected HTTP/2, HTTP/3 or mail features; nginx now also reaches the
+  reporter through a fixed upstream instead of resolving a variable address on every request.
+
 - Weekly reports on the day you choose: Settings → Schedule picks the day; each report covers the 7 days
   before it. Monday keeps calendar weeks ("Week 46"); other days are titled by date ("Week to Thu 20 Nov").
 
