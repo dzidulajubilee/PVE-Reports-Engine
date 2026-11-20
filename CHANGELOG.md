@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- Original look: the dots beside "Needs attention" items now sit next to their text instead of drifting down the page.
+- Rack and Pulse looks: the last table column has space on its right, so text no longer runs into the edge of the header bar.
+
 ## 1.0.0 (18 Nov 2026)
 
 The first release: scheduled PDF reports for Proxmox VE, from a single node to a cluster.

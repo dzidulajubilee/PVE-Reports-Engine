@@ -79,6 +79,7 @@ h1 { font-size: 28px; line-height: 32px; font-weight: 500; }
 .h3::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; background: {{ accent }}; vertical-align: 1px; }
 .t th { background: #f3f5f9; padding: 6px 8px; border-bottom: 0; }
 .t th:first-child { padding-left: 8px; } .t td:first-child { padding-left: 8px; }
+.t th:last-child, .t td:last-child { padding-right: 8px; }
 .ptitle { padding-left: 12px; border-left: 4px solid {{ accent }}; }
 {% endblock %}
 
